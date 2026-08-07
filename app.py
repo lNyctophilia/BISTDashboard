@@ -148,6 +148,10 @@ class PortfoyApp:
             self.root.after(0, _gunluk_tablo_ekle)
             self.root.after(0, self.yazdir, "-"*60)
             
+            # EMA 50 ve VWMA hesapla (Tüm df üzerinde daha doğru sonuç için)
+            df['ema_50'] = df['Close'].ewm(span=50, adjust=False).mean()
+            df['vwma_20'] = (df['Close'] * df['Volume']).rolling(window=20).sum() / df['Volume'].rolling(window=20).sum()
+            
             # 3 Aylık Mum Grafiği (Candlestick)
             import mplfinance as mpf
             from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -155,20 +159,33 @@ class PortfoyApp:
             df_3m = df.tail(64) # Son 3 ay (yaklaşık 64 işlem günü)
             if not df_3m.empty:
                 self.root.after(0, self.yazdir, "📊 3 AYLIK GÖRÜNÜM (MUM GRAFİĞİ):")
+                self.root.after(0, self.yazdir, "   (Renkler: EMA50 Yükseliş=Yeşil, Düşüş=Kırmızı | VWMA20=Mavi)")
                 
                 def _grafik_ekle():
-                    mc = mpf.make_marketcolors(up='g', down='r', inherit=True)
-                    s = mpf.make_mpf_style(marketcolors=mc, style='yahoo', gridstyle=':')
-                    
-                    fig, axes = mpf.plot(df_3m, type='candle', style=s, volume=True, returnfig=True, figsize=(7, 3.5))
-                    
-                    canvas = FigureCanvasTkAgg(fig, master=self.text_cikti)
-                    canvas.draw()
-                    self.canvases.append(canvas)
-                    
-                    self.text_cikti.window_create(tk.END, window=canvas.get_tk_widget())
-                    self.text_cikti.insert(tk.END, "\n")
-                    self.text_cikti.see(tk.END)
+                    try:
+                        # EMA'nın yükselen kısımlarını yeşil, düşen kısımlarını kırmızı yapmak için
+                        ema_up = df_3m['ema_50'].where(df_3m['ema_50'].diff() >= 0)
+                        
+                        apds = [
+                            mpf.make_addplot(df_3m['ema_50'], color='red', width=1.5),
+                            mpf.make_addplot(ema_up, color='lime', width=1.5),
+                            mpf.make_addplot(df_3m['vwma_20'], color='dodgerblue', width=1.5)
+                        ]
+                        
+                        mc = mpf.make_marketcolors(up='g', down='r', inherit=True)
+                        s = mpf.make_mpf_style(marketcolors=mc, base_mpf_style='yahoo', gridstyle=':')
+                        
+                        fig, axes = mpf.plot(df_3m, type='candle', style=s, volume=True, returnfig=True, figsize=(7, 3.5), addplot=apds)
+                        
+                        canvas = FigureCanvasTkAgg(fig, master=self.text_cikti)
+                        canvas.draw()
+                        self.canvases.append(canvas)
+                        
+                        self.text_cikti.window_create(tk.END, window=canvas.get_tk_widget())
+                        self.text_cikti.insert(tk.END, "\n")
+                        self.text_cikti.see(tk.END)
+                    except Exception as e:
+                        self.yazdir(f"❌ Grafik oluşturulurken hata: {e}")
                 
                 self.root.after(0, _grafik_ekle)
             

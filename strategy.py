@@ -43,17 +43,65 @@ def sinyal_uret(df: pd.DataFrame) -> pd.DataFrame:
     
     df["sinyal"] = "TUT"
 
-    # Altın kesişim: kısa ortalama uzun ortalamayı yukarı keserse -> AL
+    # Temel Kesişimler (Kısa / Uzun SMA)
     kisa_uzeri = df["sma_kisa"] > df["sma_uzun"]
     kisa_uzeri_onceki = kisa_uzeri.shift(1)
 
     altin_kesisim = kisa_uzeri & (~kisa_uzeri_onceki.astype(bool))
     olum_kesisimi = (~kisa_uzeri) & (kisa_uzeri_onceki.astype(bool))
 
-    # RSI filtresi: RSI 70 üstündeyse aşırı alım (AL sinyalini zayıflat)
-    #               RSI 30 altındaysa aşırı satım (SAT sinyalini zayıflat)
-    al_kosulu = altin_kesisim & (df["rsi"] < 70)
-    sat_kosulu = olum_kesisimi | (df["rsi"] > 80)  # aşırı ısınmışsa kâr al
+    # Ek İndikatör Filtreleri
+    macd_al = df["macd_line"] > df["macd_signal"]
+    macd_sat = df["macd_line"] < df["macd_signal"]
+    
+    # Fiyatın uzun vadeli trendin (SMA 50) üzerinde olup olmadığı
+    trend_olumlu = df["Close"] > df["sma_50"]
+    
+    # YENİ: SMA 50'nin yönü yukarı mı? (Son 3 güne göre)
+    trend_yon_yukari = df["sma_50"] > df["sma_50"].shift(3)
+
+    # Bollinger alt bandından yukarı sekme (Aşırı satımdan dönüş tepkisi)
+    bb_alttan_donus = (df["Close"] > df["bb_lower"]) & (df["Close"].shift(1) <= df["bb_lower"].shift(1))
+    
+    # Bollinger üst bandından aşağı dönüş (Aşırı alımdan dönüş)
+    bb_ustten_donus = (df["Close"] < df["bb_upper"]) & (df["Close"].shift(1) >= df["bb_upper"].shift(1))
+
+    # YENİ: Hacim Onayı (Varsa)
+    hacim_onayi = True
+    if "Volume" in df.columns and "vol_sma_20" in df.columns:
+        hacim_onayi = df["Volume"] > df["vol_sma_20"]
+
+    # --- AL KOŞULU ---
+    # 1. Altın kesişim var VEYA (Bollinger alt bandından döndü ve MACD onaylıyor)
+    # 2. VE Hacim ortalamanın üzerindeyse (varsa)
+    # 3. VE Genel trend olumlu (Fiyat SMA50 üzerinde) VE trendin yönü yukarı
+    # 4. VE RSI 70'in altında (Henüz aşırı alıma girmemiş)
+    al_kosulu = (
+        (altin_kesisim | (bb_alttan_donus & macd_al)) 
+        & hacim_onayi 
+        & trend_olumlu 
+        & trend_yon_yukari 
+        & (df["rsi"] < 70)
+    )
+
+    # YENİ: Trailing Stop (Süren Stop)
+    trailing_stop = False
+    if "dc_lower" in df.columns:
+        trailing_stop = df["Close"] < df["dc_lower"].shift(1)
+
+    # --- SAT KOŞULU ---
+    # 1. Ölüm kesişimi var VEYA
+    # 2. Bollinger üst bandından aşağı döndü VEYA
+    # 3. RSI 80 üzerinde (Çok aşırı ısınmış - kesin kâr al) VEYA
+    # 4. Trend zayıflıyor: MACD sat veriyor ve RSI 70'in üzerinde VEYA
+    # 5. Fiyat Donchian alt bandını kırdı (Stop-Loss)
+    sat_kosulu = (
+        olum_kesisimi 
+        | bb_ustten_donus 
+        | (df["rsi"] > 80) 
+        | (macd_sat & (df["rsi"] > 70))
+        | trailing_stop
+    )
 
     df.loc[al_kosulu, "sinyal"] = "AL"
     df.loc[sat_kosulu, "sinyal"] = "SAT"
