@@ -3,11 +3,6 @@ Genel ayarlar. DeepSeek API key'ini ortam değişkeninden okuyoruz
 (kod içine yazma, .env dosyasına koy).
 """
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # Trend hesaplama pencereleri (gün)
 KISA_T = 5      # kısa vadeli ortalama penceresi

@@ -89,3 +89,27 @@ def son_sinyal(df: pd.DataFrame) -> dict:
         ozet["hacim_ort_20"] = int(son["vol_sma_20"]) if pd.notna(son["vol_sma_20"]) else None
         
     return ozet
+
+def aylik_ozetler(df: pd.DataFrame) -> list:
+    """Son 3 ayın (Güncel, 1 Ay Önce, 2 Ay Önce, 3 Ay Önce) özet verilerini döndürür."""
+    if df.empty:
+        return []
+    
+    ozetler = []
+    son_tarih = df.index[-1]
+    
+    offsets = [0, 1, 2, 3] # aylar
+    for offset in offsets:
+        hedef_tarih = son_tarih - pd.DateOffset(months=offset)
+        # Hedef tarihe en yakın olan geçmiş günü bul
+        gecmis_df = df[df.index <= hedef_tarih]
+        if not gecmis_df.empty:
+            son = gecmis_df.iloc[-1]
+            ozetler.append({
+                "Zaman": "Güncel" if offset == 0 else f"{offset} Ay Önce",
+                "Tarih": str(son.name.date()),
+                "Kapanis": round(float(son["Close"]), 2),
+                "Sinyal": son.get("sinyal", "TUT"),
+                "RSI": round(float(son["rsi"]), 1) if pd.notna(son.get("rsi")) else "Y/V"
+            })
+    return ozetler
