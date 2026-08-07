@@ -107,7 +107,8 @@ class PortfoyApp:
             self.root.after(0, self.yazdir, f"Son Kapanış      : {ozet['kapanis']:.2f} TL")
             self.root.after(0, self.yazdir, f"Güncel Sinyal    : {ozet['sinyal']}")
             self.root.after(0, self.yazdir, f"SMA (50/200)     : {ozet.get('sma_50')} / {ozet.get('sma_200')}")
-            self.root.after(0, self.yazdir, f"RSI (14)         : {ozet['rsi']:.1f}")
+            rsi_val = f"{ozet['rsi']:.1f}" if ozet.get('rsi') is not None else "Yetersiz Veri"
+            self.root.after(0, self.yazdir, f"RSI (14)         : {rsi_val}")
             if ozet.get('bb_upper'):
                 self.root.after(0, self.yazdir, f"Bollinger Bant   : {ozet.get('bb_lower')} - {ozet.get('bb_upper')}")
             if ozet.get('dc_upper'):

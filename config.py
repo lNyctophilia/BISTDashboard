@@ -16,7 +16,7 @@ RSI_PERIYOT = 14
 
 # Backtest ayarları
 BACKTEST_BASLANGIC = "2025-01-01"
-BACKTEST_BITIS = "2026-08-01"
+BACKTEST_BITIS = None
 BASLANGIC_SERMAYE = 10000.0  # TL - paper trading için sanal sermaye
 
 PORTFOLIO_FILE = "portfolio.json"

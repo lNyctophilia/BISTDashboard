@@ -1,24 +1,55 @@
 """
-BIST fiyat verisini yfinance üzerinden çeker.
-Not: yfinance BIST hisseleri için '.IS' uzantısı ister (örn THYAO.IS).
+BIST fiyat verisini tvDatafeed (TradingView) üzerinden çeker.
+Küresel varlıklar için yfinance kullanılmaya devam eder.
 """
 import yfinance as yf
 import pandas as pd
+from tvDatafeed import TvDatafeed, Interval
+import logging
 
+# tvDatafeed nologin uyarısını gizle
+logging.getLogger('tvDatafeed').setLevel(logging.ERROR)
+tv = TvDatafeed()
 
 def fiyat_verisi_cek(ticker: str, baslangic: str, bitis: str, interval: str = "1d") -> pd.DataFrame:
     """
     Belirtilen hisse için OHLCV verisini indirir.
-    Dönüş: DataFrame (index=tarih, sütunlar=Open/High/Low/Close/Volume)
+    BIST hisseleri (.IS) için TradingView, diğerleri için yfinance kullanır.
     """
-    df = yf.download(ticker, start=baslangic, end=bitis, interval=interval, progress=False)
-    if df.empty:
-        raise ValueError(f"{ticker} için veri bulunamadı. Ticker adını kontrol et.")
-    
-    # Yeni yfinance sürümünde tek hisse bile olsa MultiIndex sütun dönebiliyor, bunu düzeltiyoruz
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
+    if ticker.endswith(".IS"):
+        sembol = ticker.replace(".IS", "")
+        # tvDatafeed ile 1000 bar (yaklaşık 4 yıllık iş günü) çek
+        df = tv.get_hist(symbol=sembol, exchange='BIST', interval=Interval.in_daily, n_bars=1000)
         
+        if df is None or df.empty:
+            raise ValueError(f"{ticker} için TradingView'da veri bulunamadı. Ticker adını kontrol et.")
+            
+        # Sütunları yfinance formatına dönüştür
+        df = df.rename(columns={
+            "open": "Open",
+            "high": "High",
+            "low": "Low",
+            "close": "Close",
+            "volume": "Volume"
+        })
+        if "symbol" in df.columns:
+            df = df.drop(columns=["symbol"])
+            
+        # Saatleri sıfırla ve tarihe göre filtrele
+        df.index = df.index.normalize()
+        if baslangic:
+            df = df.loc[df.index >= pd.to_datetime(baslangic)]
+        if bitis:
+            df = df.loc[df.index <= pd.to_datetime(bitis)]
+            
+    else:
+        df = yf.download(ticker, start=baslangic, end=bitis, interval=interval, progress=False)
+        if df.empty:
+            raise ValueError(f"{ticker} için veri bulunamadı. Ticker adını kontrol et.")
+        
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+            
     df = df.dropna()
     return df
 
@@ -30,11 +61,14 @@ def haberleri_cek(ticker: str, limit: int = 3) -> list:
     # Altın ve Gümüş fonları için küresel vadelileri aratmak daha doğru sonuç verir
     altin_byf = ["ZGOLD.IS", "GLDTR.IS", "KUTL.IS", "GGK.IS"]
     gumus_byf = ["GMTR.IS"]
+    bist_byf = ["Z30KP.IS", "Z30KE.IS", "QNBFL.IS"] # BIST endeks fonları
     
     if ticker in altin_byf:
         hedef_ticker = "GC=F"
     elif ticker in gumus_byf:
         hedef_ticker = "SI=F" # Küresel Gümüş Vadelileri
+    elif ticker in bist_byf:
+        hedef_ticker = "TUR" # iShares MSCI Turkey ETF (Genel Türkiye haberleri için)
     else:
         hedef_ticker = ticker
     
