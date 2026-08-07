@@ -1,0 +1,27 @@
+# Python önbellek dosyaları
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Çevresel değişkenler
+.env
+
+# Sanal ortam
+venv/
+env/
+.venv/
+
+# IDE ve Editör
+.vscode/
+.idea/
+
+# Loglar
+*.log
+
+# İşletim sistemi
+.DS_Store
+Thumbs.db
+
+# Kullanıcı verisi (İsteğe bağlı - Gizli kalması gerekiyorsa)
+# portfolio.json
