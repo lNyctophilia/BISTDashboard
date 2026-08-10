@@ -5,8 +5,10 @@ echo OTO GUNCELLEME VE VERSIYON DEGISTIRICI
 echo ==========================================
 echo.
 
-echo 0. Backend sunucusu baslatiliyor (Simge durumunda)...
-start /MIN "Backend API" cmd /c "cd backend && venv2\Scripts\python.exe -m uvicorn main:app --reload --port 8000"
+echo 0. Eski backend islemleri temizleniyor...
+for /f "tokens=5" %%a in ('netstat -aon ^| find "LISTENING" ^| find ":8000"') do taskkill /f /pid %%a 2>nul
+echo Backend sunucusu baslatiliyor...
+start "Backend API" cmd /c "cd backend && venv2\Scripts\python.exe -m uvicorn main:app --reload --port 8000"
 echo.
 
 :: O anki tarihi ve saati alip dateStr degiskenine atiyoruz
