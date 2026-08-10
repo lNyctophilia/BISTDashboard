@@ -1,8 +1,6 @@
 from fastapi import APIRouter, HTTPException
 import yfinance as yf
 from tradingview_ta import TA_Handler, Interval, Exchange
-import requests
-from bs4 import BeautifulSoup
 
 router = APIRouter()
 

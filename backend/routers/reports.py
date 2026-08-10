@@ -1,6 +1,4 @@
 from fastapi import APIRouter, HTTPException
-import requests
-from bs4 import BeautifulSoup
 
 router = APIRouter()
 
