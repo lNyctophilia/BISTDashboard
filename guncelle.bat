@@ -5,6 +5,10 @@ echo OTO GUNCELLEME VE VERSIYON DEGISTIRICI
 echo ==========================================
 echo.
 
+echo 0. Backend sunucusu baslatiliyor (Simge durumunda)...
+start /MIN "Backend API" cmd /c "cd backend && venv2\Scripts\python.exe -m uvicorn main:app --reload --port 8000"
+echo.
+
 :: O anki tarihi ve saati alip dateStr degiskenine atiyoruz
 FOR /F "tokens=*" %%i IN ('powershell -Command "Get-Date -Format 'dd.MM.yyyy-HH.mm'"') DO SET dateStr=%%i
 
