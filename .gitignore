@@ -134,9 +134,17 @@ cython_debug/
 Thumbs.db
 Desktop.ini
 
+# Node / JS
+node_modules/
+npm-debug.log
+yarn-error.log
+
 # Project Specific
 AI_Raporlari/
-# portfolio.json # Eğer portföyünüzün git'te takip edilmesini istemiyorsanız başındaki # işaretini kaldırın.
-
+portfolio.json
 Prompt.txt/
 Prompt.txt
+dont_look.md
+
+# Ensure .bat files are NOT ignored
+!*.bat

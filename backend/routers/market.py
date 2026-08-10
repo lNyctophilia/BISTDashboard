@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 import yfinance as yf
-from tradingview_ta import TA_Handler, Interval, Exchange
+from tradingview_ta import TA_Handler, Interval
 
 router = APIRouter()
 

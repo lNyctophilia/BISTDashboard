@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+import yfinance as yf
 
 router = APIRouter()
 
@@ -8,7 +9,6 @@ def get_news(symbol: str):
     Fetch recent news for a symbol using yfinance.
     """
     try:
-        import yfinance as yf
         yf_symbol = symbol if symbol.endswith(".IS") else f"{symbol}.IS"
         ticker = yf.Ticker(yf_symbol)
         news_data = ticker.news
