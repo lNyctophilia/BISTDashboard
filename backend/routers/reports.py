@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 import yfinance as yf
 import requests
 from bs4 import BeautifulSoup
+import pykap
 
 router = APIRouter()
 
@@ -45,15 +46,35 @@ def get_kap_reports(symbol: str):
     """
     try:
         clean_symbol = symbol.replace(".IS", "")
-        # Real scraping logic for KAP would go here.
-        # kap.org.tr uses dynamic loading (React/Vue), so standard requests might not get the full table without calling their internal API.
-        # Stubbing for now to ensure Flutter UI can be built.
+        
+        try:
+            comp = pykap.bist.BISTCompany(ticker=clean_symbol)
+            disclosures = comp.get_disclosures()
+            
+            reports = []
+            for item in disclosures[:5]:  # Get top 5 recent disclosures
+                title = item.get('title', item.get('summary', 'KAP Bildirimi'))
+                date = item.get('publishDate', '')
+                index = item.get('disclosureIndex', '')
+                link = f"https://www.kap.org.tr/tr/Bildirim/{index}" if index else "https://www.kap.org.tr/tr/"
+                
+                reports.append({
+                    "title": title,
+                    "date": date,
+                    "link": link
+                })
+        except Exception as e:
+            print(f"Pykap error for {clean_symbol}: {e}")
+            reports = []
+            
+        if not reports:
+            reports = [
+                {"title": f"{clean_symbol} için KAP verisi bulunamadı veya çekilemedi.", "date": "-", "link": "https://www.kap.org.tr/tr/"}
+            ]
+
         return {
             "symbol": symbol,
-            "reports": [
-                {"title": "Özel Durum Açıklaması (Genel)", "date": "10.08.2026", "link": "https://www.kap.org.tr/tr/"},
-                {"title": "Finansal Rapor", "date": "05.08.2026", "link": "https://www.kap.org.tr/tr/"}
-            ]
+            "reports": reports
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

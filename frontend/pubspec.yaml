@@ -37,6 +37,7 @@ dependencies:
   http: ^1.6.0
   shared_preferences: ^2.5.5
   syncfusion_flutter_charts: ^34.2.2
+  url_launcher: ^6.2.5
 
 dev_dependencies:
   flutter_test:

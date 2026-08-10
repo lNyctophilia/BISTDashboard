@@ -2,6 +2,17 @@ from fastapi import APIRouter, HTTPException
 import yfinance as yf
 import pandas as pd
 from tradingview_ta import TA_Handler, Interval
+import time
+import random
+import tradingview_ta.main
+
+# Monkey patch tradingview_ta to use a standard browser User-Agent to prevent 429 errors
+original_tv_post = tradingview_ta.main.requests.post
+def patched_tv_post(url, **kwargs):
+    if "headers" in kwargs:
+        kwargs["headers"]["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    return original_tv_post(url, **kwargs)
+tradingview_ta.main.requests.post = patched_tv_post
 
 router = APIRouter()
 
@@ -26,6 +37,7 @@ def get_quote(symbol: str):
         ticker = yf.Ticker(yf_symbol)
         
         # Get today's data
+        time.sleep(random.uniform(0.1, 0.5))  # Random delay to prevent rate limiting
         hist = ticker.history(period="2d")
         if hist.empty or len(hist) < 1:
             raise HTTPException(status_code=404, detail="Symbol not found or no data available")
@@ -46,6 +58,8 @@ def get_quote(symbol: str):
             "change": round(change, 2),
             "change_percent": round(change_percent, 2)
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -76,6 +90,7 @@ def get_signals(symbol: str):
                     exchange="BIST",
                     interval=interval
                 )
+                time.sleep(random.uniform(0.1, 0.5))  # Random delay to prevent rate limiting
                 analysis = handler.get_analysis()
                 results[label] = {
                     "summary": analysis.summary,
@@ -90,6 +105,8 @@ def get_signals(symbol: str):
             "symbol": symbol,
             "timeframes": results
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch TV signals: {str(e)}")
 
@@ -105,6 +122,7 @@ def get_chart_data(symbol: str, interval: str = "1d"):
         
         # Define period based on interval
         period = "1y" if interval in ["1d", "1wk", "1mo"] else "60d"
+        time.sleep(random.uniform(0.1, 0.5))  # Random delay to prevent rate limiting
         hist = ticker.history(period=period, interval=interval)
         
         if hist.empty:
@@ -134,6 +152,8 @@ def get_chart_data(symbol: str, interval: str = "1d"):
             
         return {"symbol": symbol, "interval": interval, "data": data}
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch chart data: {str(e)}")
 
