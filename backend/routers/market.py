@@ -24,6 +24,78 @@ def _clean_symbol(symbol: str) -> str:
         s = s.replace(".IS", "")
     return s
 
+BIST_COMPANY_NAMES = {
+    "THYAO": "Türk Hava Yolları",
+    "GARAN": "Garanti BBVA",
+    "AKBNK": "Akbank",
+    "ISCTR": "İş Bankası",
+    "SISE": "Şişecam",
+    "BIMAS": "BİM Mağazacılık",
+    "EREGL": "Erdemir",
+    "KCHOL": "Koç Holding",
+    "SAHOL": "Sabancı Holding",
+    "TUPRS": "Tüpraş",
+    "ASELS": "Aselsan",
+    "YKBNK": "Yapı Kredi Bankası",
+    "VAKBN": "VakıfBank",
+    "HALKB": "Halkbank",
+    "ZOREN": "Zorlu Enerji",
+    "PETKM": "Petkim",
+    "PGSUS": "Pegasus",
+    "SASA": "Sasa Polyester",
+    "TCELL": "Turkcell",
+    "TTKOM": "Türk Telekom",
+    "TOASO": "Tofaş Oto",
+    "FROTO": "Ford Otosan",
+    "ENKAI": "Enka İnşaat",
+    "EKGYO": "Emlak Konut GYO",
+    "KOZAL": "Koza Altın",
+    "KOZAA": "Koza Madencilik",
+    "IPEKE": "İpek Doğal Enerji",
+    "ASTOR": "Astor Enerji",
+    "KONTR": "Kontrolmatik",
+    "MGROS": "Migros",
+    "ODAS": "Odaş Elektrik",
+    "ALARK": "Alarko Holding",
+    "BRSAN": "Borusan Mannesmann",
+    "GUBRF": "Gübre Fabrikaları",
+    "HEKTS": "Hektaş",
+    "KRDMD": "Kardemir (D)",
+    "OYAKC": "Oyak Çimento",
+    "ARCLK": "Arçelik",
+    "DOHOL": "Doğan Holding",
+    "DOAS": "Doğuş Otomotiv",
+    "CIMSA": "Çimsa",
+    "ALBRK": "Albaraka Türk",
+    "TSKB": "TSKB",
+    "YATAS": "Yataş",
+    "VESTL": "Vestel",
+    "VESBE": "Vestel Beyaz Eşya",
+    "SMRTG": "Smart Güneş Enerjisi",
+    "SOKM": "Şok Marketler",
+    "TAVHL": "TAV Havalimanları",
+    "TKFEN": "Tekfen Holding",
+    "ZRGYO": "Ziraat GYO",
+    "AGHOL": "Anadolu Grubu Holding",
+    "CCOLA": "Coca-Cola İçecek",
+    "MAVI": "Mavi Giyim",
+    "MIATK": "Mia Teknoloji",
+    "REEDR": "Reeder Teknoloji",
+}
+
+def _get_company_name(symbol: str, ticker: yf.Ticker) -> str:
+    base = _clean_symbol(symbol)
+    if base in BIST_COMPANY_NAMES:
+        return BIST_COMPANY_NAMES[base]
+    try:
+        info = ticker.info
+        name = info.get('shortName') or info.get('longName') or ''
+        if name:
+            return name.strip()
+    except Exception:
+        pass
+    return ""
+
 @router.get("/quote/{symbol}")
 def get_quote(symbol: str):
     """
@@ -38,7 +110,8 @@ def get_quote(symbol: str):
         
         # Get today's data
         time.sleep(random.uniform(0.1, 0.5))  # Random delay to prevent rate limiting
-        hist = ticker.history(period="2d")
+        hist = ticker.history(period="5d")
+        hist = hist.dropna(subset=['Close'])
         if hist.empty or len(hist) < 1:
             raise HTTPException(status_code=404, detail="Symbol not found or no data available")
             
@@ -52,11 +125,14 @@ def get_quote(symbol: str):
             change = 0
             change_percent = 0
 
+        company_name = _get_company_name(symbol, ticker)
+
         return {
             "symbol": symbol,
             "price": round(current_price, 2),
             "change": round(change, 2),
-            "change_percent": round(change_percent, 2)
+            "change_percent": round(change_percent, 2),
+            "name": company_name
         }
     except HTTPException:
         raise
