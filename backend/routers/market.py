@@ -5,6 +5,14 @@ from tradingview_ta import TA_Handler, Interval
 
 router = APIRouter()
 
+def _clean_symbol(symbol: str) -> str:
+    s = symbol.upper().strip()
+    if s.startswith("BIST:"):
+        s = s.replace("BIST:", "", 1)
+    if s.endswith(".IS"):
+        s = s.replace(".IS", "")
+    return s
+
 @router.get("/quote/{symbol}")
 def get_quote(symbol: str):
     """
@@ -13,7 +21,8 @@ def get_quote(symbol: str):
     """
     try:
         # Ensure BIST symbols have .IS suffix
-        yf_symbol = symbol if symbol.endswith(".IS") else f"{symbol}.IS"
+        base_symbol = _clean_symbol(symbol)
+        yf_symbol = f"{base_symbol}.IS"
         ticker = yf.Ticker(yf_symbol)
         
         # Get today's data
@@ -47,7 +56,7 @@ def get_signals(symbol: str):
     across multiple timeframes.
     """
     try:
-        tv_symbol = symbol.replace(".IS", "")
+        tv_symbol = _clean_symbol(symbol)
         
         intervals = {
             "15 Dakika": Interval.INTERVAL_15_MINUTES,
@@ -90,7 +99,8 @@ def get_chart_data(symbol: str, interval: str = "1d"):
     Fetch OHLCV data for charts, along with EMA and Volume MA indicators.
     """
     try:
-        yf_symbol = symbol if symbol.endswith(".IS") else f"{symbol}.IS"
+        base_symbol = _clean_symbol(symbol)
+        yf_symbol = f"{base_symbol}.IS"
         ticker = yf.Ticker(yf_symbol)
         
         # Define period based on interval
