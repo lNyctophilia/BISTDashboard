@@ -196,17 +196,16 @@ def get_chart_data(symbol: str, interval: str = "1d"):
         yf_symbol = f"{base_symbol}.IS"
         ticker = yf.Ticker(yf_symbol)
         
-        # Define period based on interval
-        if interval in ["1m", "2m", "5m"]:
-            period = "7d"
-        elif interval in ["15m", "30m"]:
-            period = "60d"
-        elif interval in ["60m", "1h", "4h"]:
-            period = "1y"
-        else:
-            period = "2y"
+        # Define period based on interval and handle 4h resampling
         time.sleep(random.uniform(0.1, 0.5))  # Random delay to prevent rate limiting
-        hist = ticker.history(period=period, interval=interval)
+        if interval == "4h":
+            hist = ticker.history(period="1y", interval="1h")
+            if not hist.empty:
+                logic = {'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}
+                hist = hist.resample('4h').apply(logic).dropna(subset=['Close'])
+        else:
+            period = "2y" if interval in ["1d", "1wk", "1mo"] else "1y"
+            hist = ticker.history(period=period, interval=interval)
         
         if hist.empty:
             raise HTTPException(status_code=404, detail="No chart data available")
