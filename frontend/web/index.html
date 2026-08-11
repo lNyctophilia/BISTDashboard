@@ -7,11 +7,20 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="BIST Dashboard">
 
+  <!-- Theme Color & PWA Splash Screen Color matching dark theme -->
+  <meta name="theme-color" content="#07090e">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#07090e">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#07090e">
+  <meta name="msapplication-TileColor" content="#07090e">
+  <meta name="msapplication-navbutton-color" content="#07090e">
+
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="BIST Dashboard">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-512.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
@@ -19,6 +28,28 @@
 
   <title>BIST Dashboard</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body {
+      background-color: #07090e !important;
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+
+  <!-- Mobile Responsive Viewport Fix -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+  <!-- Instant Authentication Check (Prevents any login screen flash on startup when remembered) -->
+  <script>
+    (function () {
+      try {
+        if (sessionStorage.getItem('bist_auth') === 'true' || localStorage.getItem('bist_remember_auth') === 'true') {
+          document.documentElement.classList.add('bist-authenticated');
+        }
+      } catch (e) {}
+    })();
+  </script>
 
   <!-- Modern Glassmorphism Login Styles -->
   <link rel="stylesheet" href="login.css">

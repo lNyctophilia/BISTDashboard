@@ -141,46 +141,57 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-    body {
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    html, body {
       background-color: #131722;
       color: #D1D4DC;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       overflow: hidden;
-      height: 100vh;
-      width: 100vw;
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
       display: flex;
+      touch-action: none;
+      -webkit-touch-callout: none;
     }
     
     /* Left Vertical Toolbar */
     .sidebar {
-      width: 52px;
+      width: 44px;
       background-color: #1E222D;
       border-right: 1px solid #2A2E39;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 8px 4px;
-      gap: 6px;
+      padding: 6px 2px;
+      gap: 4px;
       z-index: 20;
+      overflow-y: auto;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .sidebar::-webkit-scrollbar {
+      display: none;
     }
     .tb-btn {
-      width: 44px;
-      height: 32px;
+      width: 38px;
+      height: 28px;
       background: #2A2E39;
       border: 1px solid #363C4E;
-      border-radius: 6px;
+      border-radius: 5px;
       color: #90A4AE;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       transition: all 0.15s ease;
+      flex-shrink: 0;
     }
     .tb-btn:hover {
       background: #363C4E;
@@ -197,7 +208,7 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
       background: rgba(41, 98, 255, 0.15);
       border-color: rgba(41, 98, 255, 0.3);
       color: #2962FF;
-      font-size: 11px;
+      font-size: 10px;
     }
     .tb-btn.auto-btn.active {
       background: #2962FF;
@@ -209,7 +220,7 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
       background: rgba(38, 166, 154, 0.15);
       border-color: rgba(38, 166, 154, 0.3);
       color: #26a69a;
-      font-size: 14px;
+      font-size: 13px;
     }
     .tb-btn.reset-btn:hover {
       background: #26a69a;
@@ -221,39 +232,58 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
       flex: 1;
       position: relative;
       height: 100%;
+      width: 100%;
       overflow: hidden;
+      touch-action: none;
     }
     #tv-chart {
       width: 100%;
       height: 100%;
+      touch-action: none;
     }
 
     /* Legend Overlay */
     .legend-overlay {
       position: absolute;
-      top: 8px;
-      left: 12px;
+      top: 6px;
+      left: 6px;
+      right: 125px; /* Clears space for timeframe bar and right price scale */
       z-index: 10;
-      font-size: 12px;
-      line-height: 1.5;
-      font-family: monospace;
+      font-size: 11px;
+      line-height: 1.3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       pointer-events: none;
-      background: rgba(19, 23, 34, 0.85);
-      padding: 4px 8px;
-      border-radius: 4px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(4px);
+      background: rgba(19, 23, 34, 0.88);
+      padding: 4px 6px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(6px);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 3px 6px;
+      max-height: 56px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
     }
-    .legend-title { font-weight: bold; color: #3B82F6; font-size: 13px; margin-right: 8px; }
+    .legend-title { font-weight: 800; color: #3B82F6; font-size: 12px; margin-right: 2px; }
+    .legend-date {
+      color: #90A4AE;
+      font-weight: 600;
+      font-size: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
     .val-up { color: #089981; font-weight: bold; }
     .val-down { color: #F23645; font-weight: bold; }
-    .val-indicator { margin-left: 8px; font-weight: 600; }
+    .val-indicator { font-weight: 600; font-size: 10px; }
 
     /* Top Right Timeframe Dropdown Bar */
     .timeframe-bar {
       position: absolute;
-      top: 8px;
-      right: 70px;
+      top: 6px;
+      right: 65px;
       z-index: 15;
       display: flex;
       align-items: center;
@@ -263,15 +293,16 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
       color: #D1D4DC;
       border: 1px solid #363C4E;
       border-radius: 6px;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
-      padding: 4px 8px;
-      height: 32px;
+      padding: 2px 4px;
+      height: 28px;
       cursor: pointer;
       outline: none;
       transition: all 0.15s ease;
       text-align: center;
-      width: 64px;
+      width: 54px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     }
     .tf-dropdown:hover {
       border-color: #2962FF;
@@ -320,11 +351,13 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
 
     let priceZoomFactor = 1.0;
 
+    const isIntraday = currentInterval === '1h' || currentInterval === '4h';
+
     const chart = LightweightCharts.createChart(container, {
       layout: {
         background: { type: 'solid', color: '#131722' },
         textColor: '#D1D4DC',
-        fontSize: 12,
+        fontSize: 11,
       },
       grid: {
         vertLines: { color: '#1E222D', style: 1 },
@@ -339,25 +372,30 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
         borderColor: '#2B2B43',
         visible: true,
         autoScale: false,
-        scaleMargins: { top: 0.1, bottom: 0.2 },
+        scaleMargins: { top: 0.15, bottom: 0.15 },
       },
       timeScale: {
         borderColor: '#2B2B43',
-        timeVisible: true,
+        timeVisible: isIntraday,
         secondsVisible: false,
-        rightOffset: 8,
-        barSpacing: 10,
+        rightOffset: 10,
+        barSpacing: 8,
+        minBarSpacing: 2,
+        fixLeftEdge: false,
+        fixRightEdge: false,
+        lockVisibleTimeRangeOnResize: true,
       },
       handleScroll: {
         mouseWheel: true,
         pressedMove: true,
         horzTouchDrag: true,
-        vertTouchDrag: true,
+        vertTouchDrag: false,
       },
       handleScale: {
         axisPressedMove: true,
         mouseWheel: true,
         pinch: true,
+        axisReset: true,
       },
     });
 
@@ -639,50 +677,77 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
     });
     resizeObserver.observe(container);
 
+    function formatDate(t) {
+      if (!t) return '';
+      let d;
+      if (typeof t === 'number') {
+        d = new Date(t * 1000);
+      } else if (typeof t === 'object' && t.year) {
+        d = new Date(t.year, t.month - 1, t.day);
+      } else {
+        return '';
+      }
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      if (isIntraday) {
+        const hours = String(d.getHours()).padStart(2, '0');
+        const mins = String(d.getMinutes()).padStart(2, '0');
+        return `\${day}.\${month}.\${year} \${hours}:\${mins}`;
+      }
+      return `\${day}.\${month}.\${year}`;
+    }
+
     // Legend
     function updateLegend(param) {
-      if (!param.time || !param.seriesData || param.seriesData.size === 0) {
-        if (candles.length > 0) {
-          const last = candles[candles.length - 1];
-          const chg = (((last.close - last.open) / last.open) * 100).toFixed(2);
-          const cls = last.close >= last.open ? 'val-up' : 'val-down';
-          const sign = chg >= 0 ? '+' : '';
-          legend.innerHTML = `<span class="legend-title">\${symbol}</span>` +
-            `A: <span class="\${cls}">\${last.open}</span> ` +
-            `Y: <span class="\${cls}">\${last.high}</span> ` +
-            `D: <span class="\${cls}">\${last.low}</span> ` +
-            `K: <span class="\${cls}">\${last.close}</span> ` +
-            `(\${sign}\${chg}%)`;
-        }
-        return;
+      let cData = null;
+      let tTime = null;
+      let isHovered = false;
+
+      if (param && param.time && param.seriesData && param.seriesData.size > 0) {
+        cData = param.seriesData.get(candleSeries);
+        tTime = param.time;
+        isHovered = true;
       }
 
-      const cData = param.seriesData.get(candleSeries);
-      if (cData) {
-        const chg = (((cData.close - cData.open) / cData.open) * 100).toFixed(2);
-        const cls = cData.close >= cData.open ? 'val-up' : 'val-down';
-        const sign = chg >= 0 ? '+' : '';
-        let txt = `<span class="legend-title">\${symbol}</span>` +
-          `A: <span class="\${cls}">\${cData.open}</span> ` +
-          `Y: <span class="\${cls}">\${cData.high}</span> ` +
-          `D: <span class="\${cls}">\${cData.low}</span> ` +
-          `K: <span class="\${cls}">\${cData.close}</span> ` +
-          `<span class="\${cls}">(\${sign}\${chg}%)</span>`;
+      if (!cData && candles.length > 0) {
+        const last = candles[candles.length - 1];
+        cData = { open: last.open, high: last.high, low: last.low, close: last.close };
+        tTime = last.time;
+      }
 
+      if (!cData || cData.open === undefined || cData.close === undefined) return;
+
+      const chg = (((cData.close - cData.open) / cData.open) * 100).toFixed(2);
+      const cls = cData.close >= cData.open ? 'val-up' : 'val-down';
+      const sign = chg >= 0 ? '+' : '';
+      const dateStr = formatDate(tTime);
+
+      let txt = `<span class="legend-title">\${symbol}</span>`;
+      if (dateStr) {
+        txt += `<span class="legend-date">\${dateStr}</span>`;
+      }
+      txt += `<span>A:<span class="\${cls}">\${cData.open}</span></span>` +
+        `<span>Y:<span class="\${cls}">\${cData.high}</span></span>` +
+        `<span>D:<span class="\${cls}">\${cData.low}</span></span>` +
+        `<span>K:<span class="\${cls}">\${cData.close}</span></span>` +
+        `<span class="\${cls}">(\${sign}\${chg}%)</span>`;
+
+      if (isHovered && param && param.seriesData) {
         const emaVal = param.seriesData.get(emaSeries);
-        if (emaVal && emaSeries.options().visible) {
-          txt += ` <span class="val-indicator" style="color:#2962FF">EMA: \${emaVal.value}</span>`;
+        if (emaVal && emaSeries.options().visible && emaVal.value !== undefined) {
+          txt += `<span class="val-indicator" style="color:#2962FF">EMA:\${emaVal.value.toFixed(2)}</span>`;
         }
         const smaVal = param.seriesData.get(smaSeries);
-        if (smaVal && smaSeries.options().visible) {
-          txt += ` <span class="val-indicator" style="color:#FF6D00">SMA: \${smaVal.value}</span>`;
+        if (smaVal && smaSeries.options().visible && smaVal.value !== undefined) {
+          txt += `<span class="val-indicator" style="color:#FF6D00">SMA:\${smaVal.value.toFixed(2)}</span>`;
         }
         const rsiVal = param.seriesData.get(rsiSeries);
-        if (rsiVal && rsiSeries.options().visible) {
-          txt += ` <span class="val-indicator" style="color:#9C27B0">RSI: \${rsiVal.value}</span>`;
+        if (rsiVal && rsiSeries.options().visible && rsiVal.value !== undefined) {
+          txt += `<span class="val-indicator" style="color:#9C27B0">RSI:\${rsiVal.value.toFixed(2)}</span>`;
         }
-        legend.innerHTML = txt;
       }
+      legend.innerHTML = txt;
     }
     chart.subscribeCrosshairMove(updateLegend);
     updateLegend({});
@@ -834,8 +899,12 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final chartHeight = isMobile ? 420.0 : 500.0;
+
     return Container(
-      height: 480,
+      height: chartHeight,
       decoration: BoxDecoration(
         color: const Color(0xFF131722),
         borderRadius: BorderRadius.circular(12),

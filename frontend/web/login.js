@@ -54,8 +54,8 @@
     const localAuth = localStorage.getItem('bist_remember_auth');
 
     if (sessionAuth === 'true' || localAuth === 'true') {
-      screen.classList.add('auth-unlocked');
-      setTimeout(() => { screen.style.display = 'none'; }, 500);
+      document.documentElement.classList.add('bist-authenticated');
+      screen.style.display = 'none';
       return;
     }
 

@@ -59,7 +59,7 @@ def fetch_ak_targets():
                             targets[sym] = {
                                 "broker": "Ak Yatırım",
                                 "target_price": round(target_val, 2),
-                                "recommendation": "Model Portföy (Al)",
+                                "recommendation": "Al",
                                 "date": dt_str if dt_str else "Güncel"
                             }
                     except (ValueError, TypeError):
@@ -125,7 +125,7 @@ def fetch_ziraat_targets():
                                             targets[s_upper] = {
                                                 'broker': 'Ziraat Yatırım',
                                                 'target_price': round(price, 2),
-                                                'recommendation': rec.upper(),
+                                                'recommendation': rec.strip().capitalize(),
                                                 'date': date_str
                                             }
                                         except (ValueError, TypeError):
@@ -177,7 +177,7 @@ def fetch_yky_targets():
                                 targets[sym] = {
                                     "broker": "Yapı Kredi Yatırım",
                                     "target_price": round(target_val, 2),
-                                    "recommendation": "Model Portföy (Al)",
+                                    "recommendation": "Al",
                                     "date": dt_str if dt_str else "Güncel"
                                 }
                         except (ValueError, TypeError):
@@ -217,7 +217,7 @@ def fetch_deniz_targets():
                         targets[sym] = {
                             "broker": "Deniz Yatırım",
                             "target_price": round(price, 2),
-                            "recommendation": f"Model Portföy (+{pot})",
+                            "recommendation": "Al",
                             "date": "Güncel"
                         }
                     except (ValueError, TypeError):
@@ -298,7 +298,7 @@ def fetch_tera_targets():
                                 targets[sym] = {
                                     'broker': 'Tera Yatırım',
                                     'target_price': round(target, 2),
-                                    'recommendation': f'Model Portföy (+%{pot_clean})',
+                                    'recommendation': 'Al',
                                     'date': report_date_str
                                 }
                             except (ValueError, TypeError):
@@ -338,7 +338,7 @@ def fetch_hsbc_targets():
                         target_val = float(price_target)
                         if target_val > 0 and sym not in targets:
                             dt_str = pub_date.split('T')[0] if 'T' in pub_date else str(pub_date)
-                            rec_str = f"Model Portföy ({rec_type})" if in_mp else rec_type
+                            rec_str = rec_type
                             targets[sym] = {
                                 "broker": "HSBC Yatırım",
                                 "target_price": round(target_val, 2),

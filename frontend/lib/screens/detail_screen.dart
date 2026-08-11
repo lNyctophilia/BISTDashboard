@@ -179,14 +179,19 @@ class _DetailScreenState extends State<DetailScreen> {
                           onIntervalChanged: _onIntervalChanged,
                         )
                       else
-                        Container(
-                          height: 480,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF151518),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white10),
-                          ),
-                          child: const Center(child: Text("Grafik verisi bulunamadı", style: TextStyle(color: Colors.white54))),
+                        Builder(
+                          builder: (context) {
+                            final isMobile = MediaQuery.of(context).size.width < 600;
+                            return Container(
+                              height: isMobile ? 420 : 500,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF151518),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.white10),
+                              ),
+                              child: const Center(child: Text("Grafik verisi bulunamadı", style: TextStyle(color: Colors.white54))),
+                            );
+                          },
                         ),
                       if (_isChartLoading)
                         Positioned.fill(
@@ -333,6 +338,15 @@ class _DetailScreenState extends State<DetailScreen> {
     }
 
     children.addAll(targets.map((t) {
+      String rawRec = (t['recommendation'] ?? '').toString();
+      String recText = rawRec;
+      final mpMatch = RegExp(r'Model\s+Portfö?y\s*\((.*?)\)', caseSensitive: false).firstMatch(recText);
+      if (mpMatch != null) {
+        recText = mpMatch.group(1) ?? recText;
+      }
+      recText = recText.replaceAll(RegExp(r'Model\s+Portfö?y', caseSensitive: false), '').trim();
+      if (recText.isEmpty) recText = 'Al';
+
       return Card(
         color: const Color(0xFF151518),
         margin: const EdgeInsets.only(bottom: 8),
@@ -344,7 +358,7 @@ class _DetailScreenState extends State<DetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text('₺${t['target_price']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              Text(t['recommendation'], style: const TextStyle(color: Colors.blueAccent)),
+              Text(recText, style: const TextStyle(color: Colors.blueAccent)),
             ],
           ),
         ),

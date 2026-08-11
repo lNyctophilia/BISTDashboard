@@ -327,6 +327,14 @@
   visibility: hidden;
 }
 
+/* Instant zero-flash hide for remembered/authenticated session */
+html.bist-authenticated #login-screen {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 /* Security Note Footer */
 .auth-footer {
   margin-top: 24px;
