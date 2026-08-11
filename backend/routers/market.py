@@ -189,7 +189,7 @@ def get_signals(symbol: str):
 @router.get("/chart/{symbol}")
 def get_chart_data(symbol: str, interval: str = "1d"):
     """
-    Fetch OHLCV data for charts, along with EMA and Volume MA indicators.
+    Fetch OHLCV data for charts, along with EMA, SMA, Bollinger Bands, RSI, MACD and Volume MA indicators.
     """
     try:
         base_symbol = _clean_symbol(symbol)
@@ -197,33 +197,66 @@ def get_chart_data(symbol: str, interval: str = "1d"):
         ticker = yf.Ticker(yf_symbol)
         
         # Define period based on interval
-        period = "1y" if interval in ["1d", "1wk", "1mo"] else "60d"
+        period = "2y" if interval in ["1d", "1wk", "1mo"] else "60d"
         time.sleep(random.uniform(0.1, 0.5))  # Random delay to prevent rate limiting
         hist = ticker.history(period=period, interval=interval)
         
         if hist.empty:
             raise HTTPException(status_code=404, detail="No chart data available")
             
-        # Calculate EMA (e.g., 20 period EMA)
+        # Calculate EMA (20 period)
         hist['EMA'] = hist['Close'].ewm(span=20, adjust=False).mean()
         
-        # Calculate Volume MA (e.g., 20 period moving average of volume)
-        hist['VolumeMA'] = hist['Volume'].rolling(window=20).mean()
+        # Calculate SMA (50 period)
+        hist['SMA50'] = hist['Close'].rolling(window=50, min_periods=1).mean()
+
+        # Calculate Volume MA (20 period)
+        hist['VolumeMA'] = hist['Volume'].rolling(window=20, min_periods=1).mean()
         
-        # Handle NaN values by replacing them with None or 0 for JSON serialization
+        # Calculate Bollinger Bands (20 period, 2 std)
+        boll_mid = hist['Close'].rolling(window=20, min_periods=1).mean()
+        boll_std = hist['Close'].rolling(window=20, min_periods=1).std().fillna(0)
+        hist['BollMiddle'] = boll_mid
+        hist['BollUpper'] = boll_mid + (boll_std * 2)
+        hist['BollLower'] = boll_mid - (boll_std * 2)
+
+        # Calculate RSI (14 period)
+        delta = hist['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14, min_periods=1).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=1).mean()
+        rs = gain / (loss.replace(0, 1e-9))
+        hist['RSI'] = 100 - (100 / (1 + rs))
+
+        # Calculate MACD (12, 26, 9)
+        ema12 = hist['Close'].ewm(span=12, adjust=False).mean()
+        ema26 = hist['Close'].ewm(span=26, adjust=False).mean()
+        hist['MACD'] = ema12 - ema26
+        hist['MACDSignal'] = hist['MACD'].ewm(span=9, adjust=False).mean()
+        hist['MACDHist'] = hist['MACD'] - hist['MACDSignal']
+
+        # Handle NaN values
         hist = hist.fillna(0)
         
         data = []
         for index, row in hist.iterrows():
+            c_val = float(row['Close'])
             data.append({
-                "time": index.timestamp() * 1000, # milliseconds
-                "open": round(row['Open'], 2),
-                "high": round(row['High'], 2),
-                "low": round(row['Low'], 2),
-                "close": round(row['Close'], 2),
+                "time": int(index.timestamp() * 1000), # milliseconds
+                "open": round(float(row['Open']), 2),
+                "high": round(float(row['High']), 2),
+                "low": round(float(row['Low']), 2),
+                "close": round(c_val, 2),
                 "volume": int(row['Volume']),
-                "ema": round(row['EMA'], 2) if row['EMA'] > 0 else None,
-                "volume_ma": int(row['VolumeMA']) if row['VolumeMA'] > 0 else None
+                "ema": round(float(row['EMA']), 2) if row['EMA'] > 0 else None,
+                "sma_50": round(float(row['SMA50']), 2) if row['SMA50'] > 0 else None,
+                "volume_ma": int(row['VolumeMA']) if row['VolumeMA'] > 0 else None,
+                "bollinger_upper": round(float(row['BollUpper']), 2) if row['BollUpper'] > 0 else None,
+                "bollinger_middle": round(float(row['BollMiddle']), 2) if row['BollMiddle'] > 0 else None,
+                "bollinger_lower": round(float(row['BollLower']), 2) if row['BollLower'] > 0 else None,
+                "rsi": round(float(row['RSI']), 2) if row['RSI'] > 0 else None,
+                "macd": round(float(row['MACD']), 2),
+                "macd_signal": round(float(row['MACDSignal']), 2),
+                "macd_hist": round(float(row['MACDHist']), 2),
             })
             
         return {"symbol": symbol, "interval": interval, "data": data}
@@ -232,4 +265,5 @@ def get_chart_data(symbol: str, interval: str = "1d"):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch chart data: {str(e)}")
+
 
