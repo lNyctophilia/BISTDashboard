@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routers import market, reports
 
 app = FastAPI(
-    title="Finance Portfolio API",
+    title="BIST Dashboard API",
     description="API for fetching BIST stock data, KAP reports, and technical signals.",
     version="1.0.0"
 )
@@ -22,4 +22,4 @@ app.include_router(reports.router, prefix="/api")
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the Finance Portfolio API"}
+    return {"message": "Welcome to the BIST Dashboard API"}

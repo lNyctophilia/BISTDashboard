@@ -139,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Icon(Icons.trending_up, color: Colors.blueAccent, size: 26),
             SizedBox(width: 8),
-            Text('Finance', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text('BIST Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
         backgroundColor: const Color(0xFF151518),
@@ -165,7 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const Padding(
             padding: EdgeInsets.all(8.0),
             child: Text(
-              'Versiyon (11.08.2026-06.10)',
+              'Versiyon (11.08.2026-12.57)',
               style: TextStyle(color: Colors.white38, fontSize: 12),
             ),
           ),

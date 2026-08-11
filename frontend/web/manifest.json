@@ -1,11 +1,11 @@
 {
-    "name": "Finance",
-    "short_name": "Finance",
+    "name": "BIST Dashboard",
+    "short_name": "BIST Dashboard",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Finance App",
+    "description": "BIST Dashboard",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

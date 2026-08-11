@@ -1,0 +1,345 @@
+/* ==========================================================================
+   BIST DASHBOARD - MODERN GLASSMORPHISM LOGIN OVERLAY STYLES
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --auth-bg-dark: #07090e;
+  --auth-card-bg: rgba(15, 23, 42, 0.78);
+  --auth-card-border: rgba(255, 255, 255, 0.12);
+  --auth-text-main: #f8fafc;
+  --auth-text-muted: #94a3b8;
+  --auth-primary-start: #3b82f6;
+  --auth-primary-end: #6366f1;
+  --auth-accent-glow: rgba(99, 102, 241, 0.35);
+  --auth-danger: #ef4444;
+  --auth-danger-bg: rgba(239, 68, 68, 0.12);
+  --auth-radius: 18px;
+}
+
+/* Fullscreen Overlay Container */
+#login-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 999999;
+  background-color: var(--auth-bg-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.5s;
+  box-sizing: border-box;
+}
+
+#login-screen * {
+  box-sizing: border-box;
+}
+
+/* Animated Ambient Backlight Blobs */
+.auth-ambient-glow {
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  filter: blur(140px);
+  pointer-events: none;
+  opacity: 0.55;
+  animation: authPulse 8s infinite alternate ease-in-out;
+}
+
+.auth-ambient-1 {
+  top: -100px;
+  left: -100px;
+  background: radial-gradient(circle, #3b82f6 0%, transparent 70%);
+}
+
+.auth-ambient-2 {
+  bottom: -120px;
+  right: -100px;
+  background: radial-gradient(circle, #8b5cf6 0%, transparent 70%);
+  animation-delay: -4s;
+}
+
+@keyframes authPulse {
+  0% { transform: scale(1) translate(0, 0); opacity: 0.45; }
+  100% { transform: scale(1.15) translate(30px, 20px); opacity: 0.65; }
+}
+
+/* Central Login Glass Card */
+.auth-card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  padding: 40px 36px;
+  margin: 20px;
+  background: var(--auth-card-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--auth-card-border);
+  border-radius: var(--auth-radius);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7),
+              0 0 30px var(--auth-accent-glow);
+  z-index: 2;
+  text-align: center;
+  transform: translateY(0);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.auth-card:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.8),
+              0 0 40px rgba(99, 102, 241, 0.45);
+}
+
+/* Header & Logo */
+.auth-header {
+  margin-bottom: 32px;
+}
+
+.auth-icon-wrapper {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 18px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
+}
+
+.auth-icon-wrapper svg {
+  width: 32px;
+  height: 32px;
+  color: #60a5fa;
+  filter: drop-shadow(0 2px 8px rgba(59, 130, 246, 0.5));
+}
+
+.auth-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--auth-text-main);
+  letter-spacing: -0.02em;
+  margin: 0 0 8px 0;
+  background: linear-gradient(135deg, #ffffff 30%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.auth-subtitle {
+  font-size: 14px;
+  color: var(--auth-text-muted);
+  margin: 0;
+  font-weight: 400;
+}
+
+/* Form Controls */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.auth-input-group {
+  position: relative;
+  text-align: left;
+}
+
+.auth-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--auth-text-muted);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.auth-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-input {
+  width: 100%;
+  padding: 14px 44px 14px 16px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  font-size: 15px;
+  color: var(--auth-text-main);
+  outline: none;
+  font-family: inherit;
+  transition: all 0.25s ease;
+  letter-spacing: 0.02em;
+}
+
+.auth-input::placeholder {
+  color: rgba(148, 163, 184, 0.4);
+}
+
+.auth-input:focus {
+  border-color: var(--auth-primary-start);
+  background: rgba(15, 23, 42, 0.85);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25);
+}
+
+/* Eye Toggle Button */
+.auth-eye-btn {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--auth-text-muted);
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: color 0.2s ease;
+}
+
+.auth-eye-btn:hover {
+  color: var(--auth-text-main);
+}
+
+.auth-eye-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Remember Me Checkbox */
+.auth-remember-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--auth-text-muted);
+}
+
+.auth-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.auth-checkbox-label input[type="checkbox"] {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.6);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.auth-checkbox-label input[type="checkbox"]:checked {
+  background: var(--auth-primary-start);
+  border-color: var(--auth-primary-start);
+}
+
+.auth-checkbox-label input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* Submit Button */
+.auth-submit-btn {
+  width: 100%;
+  padding: 15px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--auth-primary-start), var(--auth-primary-end));
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+}
+
+.auth-submit-btn:active {
+  transform: translateY(0);
+}
+
+/* Error Message Banner */
+.auth-error-banner {
+  display: none;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--auth-danger-bg);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* Shake Animation for Incorrect Password */
+.auth-shake {
+  animation: authShakeAnim 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes authShakeAnim {
+  10%, 90% { transform: translate3d(-2px, 0, 0); }
+  20%, 80% { transform: translate3d(4px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-8px, 0, 0); }
+  40%, 60% { transform: translate3d(8px, 0, 0); }
+}
+
+/* Unlock Dismiss Animation */
+#login-screen.auth-unlocked {
+  opacity: 0;
+  transform: scale(1.05);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+/* Security Note Footer */
+.auth-footer {
+  margin-top: 24px;
+  font-size: 12px;
+  color: rgba(148, 163, 184, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.auth-footer svg {
+  width: 14px;
+  height: 14px;
+  color: #34d399;
+}

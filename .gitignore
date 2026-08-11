@@ -49,6 +49,8 @@ dont_look.md
 AI_Raporlari/
 portfolio.json
 Prompt.txt
+frontend/web/auth-config.js
+auth-config.js
 
 # --- Explicitly Tracked ---
 !*.bat

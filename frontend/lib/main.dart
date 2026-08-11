@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 
 void main() {
-  runApp(const FinanceApp());
+  runApp(const BistDashboardApp());
 }
 
-class FinanceApp extends StatelessWidget {
-  const FinanceApp({super.key});
+class BistDashboardApp extends StatelessWidget {
+  const BistDashboardApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Finance',
+      title: 'BIST Dashboard',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
