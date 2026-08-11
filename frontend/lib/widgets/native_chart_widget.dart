@@ -489,7 +489,20 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
 
       if (!candles || candles.length === 0) return;
 
-      const recent = candles.slice(-30);
+      const tf = (currentInterval || '1d').toLowerCase();
+      let lookback = 2;
+      if (tf === '1h') {
+        lookback = 8;
+      } else if (tf === '4h') {
+        lookback = 4;
+      } else if (tf === '1d' || tf === '1wk' || tf === '1mo') {
+        lookback = 2;
+      } else {
+        lookback = 5;
+      }
+
+      const count = Math.min(lookback, candles.length);
+      const recent = candles.slice(-count);
       let rHigh = -Infinity, rLow = Infinity;
       recent.forEach(c => {
         if (c.high > rHigh) rHigh = c.high;
