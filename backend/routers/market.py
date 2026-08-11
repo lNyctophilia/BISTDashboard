@@ -264,8 +264,33 @@ def get_chart_data(symbol: str, interval: str = "1d"):
                 "macd_signal": round(float(row['MACDSignal']), 2),
                 "macd_hist": round(float(row['MACDHist']), 2),
             })
+
+        # Calculate Pivot Points & Support / Resistance
+        last_30 = hist.tail(30)
+        recent_high = float(last_30['High'].max())
+        recent_low = float(last_30['Low'].min())
+        recent_close = float(last_30['Close'].iloc[-1])
+        
+        pivot = round((recent_high + recent_low + recent_close) / 3, 2)
+        r1 = round((2 * pivot) - recent_low, 2)
+        s1 = round((2 * pivot) - recent_high, 2)
+        r2 = round(pivot + (recent_high - recent_low), 2)
+        s2 = round(pivot - (recent_high - recent_low), 2)
+        
+        support_resistance = {
+            "pivot": pivot,
+            "r1": r1,
+            "s1": s1,
+            "r2": r2,
+            "s2": s2,
+        }
             
-        return {"symbol": symbol, "interval": interval, "data": data}
+        return {
+            "symbol": symbol,
+            "interval": interval,
+            "data": data,
+            "support_resistance": support_resistance,
+        }
         
     except HTTPException:
         raise
