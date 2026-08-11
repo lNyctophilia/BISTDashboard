@@ -165,7 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const Padding(
             padding: EdgeInsets.all(8.0),
             child: Text(
-              'Versiyon (11.08.2026-05.22)',
+              'Versiyon (11.08.2026-05.29)',
               style: TextStyle(color: Colors.white38, fontSize: 12),
             ),
           ),
