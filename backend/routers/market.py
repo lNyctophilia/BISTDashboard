@@ -322,38 +322,25 @@ def get_chart_data(symbol: str, interval: str = "1d"):
                 "macd_hist": round(float(row['MACDHist']), 2),
             })
 
-        # Calculate Pivot Points & Support / Resistance based on previous completed period
+        # Calculate Pivot Points & Support / Resistance based on timeframe interval lookback
         tf = (interval or "1d").lower()
-        n = len(hist)
-        if n >= 2:
-            if tf in ["1d", "1wk", "1mo"]:
-                # Use previous completed candle (excluding current active candle)
-                ref_row = hist.iloc[-2]
-                recent_high = float(ref_row['High'])
-                recent_low = float(ref_row['Low'])
-                recent_close = float(ref_row['Close'])
-            elif tf == "1h":
-                # Use previous 8 completed candles
-                recent_hist = hist.iloc[-9:-1] if n >= 9 else hist.iloc[:-1]
-                recent_high = float(recent_hist['High'].max())
-                recent_low = float(recent_hist['Low'].min())
-                recent_close = float(recent_hist['Close'].iloc[-1])
-            elif tf == "4h":
-                # Use previous 4 completed candles
-                recent_hist = hist.iloc[-5:-1] if n >= 5 else hist.iloc[:-1]
-                recent_high = float(recent_hist['High'].max())
-                recent_low = float(recent_hist['Low'].min())
-                recent_close = float(recent_hist['Close'].iloc[-1])
-            else:
-                ref_row = hist.iloc[-2]
-                recent_high = float(ref_row['High'])
-                recent_low = float(ref_row['Low'])
-                recent_close = float(ref_row['Close'])
+        if tf == "1h":
+            n_candles = 15
+        elif tf == "4h":
+            n_candles = 15
+        elif tf == "1d":
+            n_candles = 14
+        elif tf == "1wk":
+            n_candles = 12
+        elif tf == "1mo":
+            n_candles = 8
         else:
-            ref_row = hist.iloc[-1]
-            recent_high = float(ref_row['High'])
-            recent_low = float(ref_row['Low'])
-            recent_close = float(ref_row['Close'])
+            n_candles = 14
+
+        recent_hist = hist.tail(min(n_candles, len(hist)))
+        recent_high = float(recent_hist['High'].max())
+        recent_low = float(recent_hist['Low'].min())
+        recent_close = float(recent_hist['Close'].iloc[-1])
         
         pivot = round((recent_high + recent_low + recent_close) / 3, 2)
         r1 = round((2 * pivot) - recent_low, 2)

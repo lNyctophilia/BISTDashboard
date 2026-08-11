@@ -490,46 +490,27 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
       if (!candles || candles.length === 0) return;
 
       const tf = (currentInterval || '1d').toLowerCase();
-      const n = candles.length;
-      let rHigh, rLow, rClose;
-
-      if (n >= 2) {
-        if (tf === '1d' || tf === '1wk' || tf === '1mo') {
-          // Use previous completed candle (excluding current forming candle)
-          const prev = candles[n - 2];
-          rHigh = prev.high;
-          rLow = prev.low;
-          rClose = prev.close;
-        } else if (tf === '1h') {
-          const count = n >= 9 ? 8 : n - 1;
-          const recent = candles.slice(n - 1 - count, n - 1);
-          rHigh = -Infinity; rLow = Infinity;
-          recent.forEach(c => {
-            if (c.high > rHigh) rHigh = c.high;
-            if (c.low < rLow) rLow = c.low;
-          });
-          rClose = recent[recent.length - 1].close;
-        } else if (tf === '4h') {
-          const count = n >= 5 ? 4 : n - 1;
-          const recent = candles.slice(n - 1 - count, n - 1);
-          rHigh = -Infinity; rLow = Infinity;
-          recent.forEach(c => {
-            if (c.high > rHigh) rHigh = c.high;
-            if (c.low < rLow) rLow = c.low;
-          });
-          rClose = recent[recent.length - 1].close;
-        } else {
-          const prev = candles[n - 2];
-          rHigh = prev.high;
-          rLow = prev.low;
-          rClose = prev.close;
-        }
-      } else {
-        const last = candles[0];
-        rHigh = last.high;
-        rLow = last.low;
-        rClose = last.close;
+      let lookback = 14;
+      if (tf === '1h') {
+        lookback = 15;
+      } else if (tf === '4h') {
+        lookback = 15;
+      } else if (tf === '1d') {
+        lookback = 14;
+      } else if (tf === '1wk') {
+        lookback = 12;
+      } else if (tf === '1mo') {
+        lookback = 8;
       }
+
+      const count = Math.min(lookback, candles.length);
+      const recent = candles.slice(-count);
+      let rHigh = -Infinity, rLow = Infinity;
+      recent.forEach(c => {
+        if (c.high > rHigh) rHigh = c.high;
+        if (c.low < rLow) rLow = c.low;
+      });
+      const rClose = recent[recent.length - 1].close;
 
       const p = Number(((rHigh + rLow + rClose) / 3).toFixed(2));
       const r1 = Number(((2 * p) - rLow).toFixed(2));
