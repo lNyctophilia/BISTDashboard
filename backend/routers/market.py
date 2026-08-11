@@ -96,6 +96,63 @@ def _get_company_name(symbol: str, ticker: yf.Ticker) -> str:
         pass
     return ""
 
+@router.get("/quotes/batch")
+def get_batch_quotes(symbols: str):
+    """
+    Fetch quotes for multiple symbols separated by comma (e.g. symbols=THYAO,GARAN,AKBNK).
+    Returns a dict with symbol -> quote mapping.
+    """
+    sym_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    if not sym_list:
+        return {}
+
+    clean_map = {s: _clean_symbol(s) for s in sym_list}
+    yf_symbols = [f"{clean_map[s]}.IS" for s in sym_list]
+
+    try:
+        df = yf.download(yf_symbols, period="5d", group_by="ticker", threads=True, progress=False)
+
+        results = {}
+        for orig_sym in sym_list:
+            base_sym = clean_map[orig_sym]
+            yf_sym = f"{base_sym}.IS"
+            try:
+                if yf_sym in df:
+                    sub = df[yf_sym]
+                elif base_sym in df:
+                    sub = df[base_sym]
+                else:
+                    sub = df
+                
+                if sub is not None and not sub.empty:
+                    hist = sub.dropna(subset=['Close'])
+                    if not hist.empty and len(hist) >= 1:
+                        current_price = float(hist['Close'].iloc[-1])
+                        if len(hist) >= 2:
+                            prev_close = float(hist['Close'].iloc[-2])
+                            change = current_price - prev_close
+                            change_percent = (change / prev_close) * 100
+                        else:
+                            change = 0.0
+                            change_percent = 0.0
+
+                        company_name = BIST_COMPANY_NAMES.get(base_sym, "")
+
+                        results[orig_sym] = {
+                            "symbol": orig_sym,
+                            "price": round(current_price, 2),
+                            "change": round(change, 2),
+                            "change_percent": round(change_percent, 2),
+                            "name": company_name
+                        }
+            except Exception as e:
+                print(f"Error parsing batch quote for {orig_sym}: {e}")
+
+        return results
+    except Exception as e:
+        print(f"Batch fetch error: {e}")
+        return {}
+
 @router.get("/quote/{symbol}")
 def get_quote(symbol: str):
     """
