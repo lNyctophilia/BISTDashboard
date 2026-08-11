@@ -428,54 +428,65 @@ class _DetailScreenState extends State<DetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF24242A),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.white24, width: 1),
-                        ),
-                        child: Text(
-                          category,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF24242A),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.white24, width: 1),
+                                  ),
+                                  child: Text(
+                                    category,
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  r['date'] ?? '',
+                                  style: const TextStyle(color: Colors.white38, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              r['title'] ?? '',
+                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                            ),
+                          ],
                         ),
                       ),
-                      Text(
-                        r['date'] ?? '',
-                        style: const TextStyle(color: Colors.white38, fontSize: 11),
+                      const SizedBox(width: 12),
+                      InkWell(
+                        onTap: () async {
+                          final url = Uri.parse(r['link'] ?? r['url'] ?? '');
+                          if (await canLaunchUrl(url)) {
+                            await launchUrl(url);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF222228),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.white12, width: 1),
+                          ),
+                          child: const Icon(Icons.open_in_new, color: Colors.white70, size: 18),
+                        ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    r['title'] ?? '',
-                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 8),
-                  InkWell(
-                    onTap: () async {
-                      final url = Uri.parse(r['link'] ?? r['url'] ?? '');
-                      if (await canLaunchUrl(url)) {
-                        await launchUrl(url);
-                      }
-                    },
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Text(
-                          'KAP\'ta Görüntüle',
-                          style: TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w500),
-                        ),
-                        SizedBox(width: 4),
-                        Icon(Icons.open_in_new, color: Colors.white60, size: 14),
-                      ],
-                    ),
                   ),
                 ],
               ),
