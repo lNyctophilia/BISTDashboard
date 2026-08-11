@@ -20,6 +20,7 @@ class _DetailScreenState extends State<DetailScreen> {
   Map<String, dynamic>? _news;
   Map<String, dynamic>? _kapReports;
   Map<String, dynamic>? _brokerTargets;
+  bool _showAllKapReports = false;
   
   List<ChartData>? _chartData;
   String _selectedInterval = '1d';
@@ -74,6 +75,7 @@ class _DetailScreenState extends State<DetailScreen> {
         _news = results[1];
         _kapReports = results[2];
         _brokerTargets = results[3];
+        _showAllKapReports = false;
         if (results[5] != null) {
           _quote = results[5];
         }
@@ -354,30 +356,178 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
+  bool _isWithinLast4Days(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty || dateStr == '-') return false;
+    try {
+      final parts = dateStr.trim().split(' ');
+      if (parts.isEmpty) return false;
+      final dParts = parts[0].split('.');
+      if (dParts.length == 3) {
+        final day = int.parse(dParts[0]);
+        final month = int.parse(dParts[1]);
+        final year = int.parse(dParts[2]);
+        final pubDate = DateTime(year, month, day);
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final diff = today.difference(pubDate).inDays;
+        return diff >= 0 && diff <= 4;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   Widget _buildKapReportsSection() {
     if (_kapReports == null || _kapReports!['reports'] == null) {
       return const Text('KAP verisi bulunamadı.', style: TextStyle(color: Colors.white54));
     }
     
     final reports = _kapReports!['reports'] as List;
+    if (reports.isEmpty) {
+      return const Text('KAP verisi bulunamadı.', style: TextStyle(color: Colors.white54));
+    }
+
+    final recentReports = reports.where((r) {
+      if (r['is_recent'] == true) return true;
+      return _isWithinLast4Days(r['date']?.toString());
+    }).toList();
+
+    final displayedReports = _showAllKapReports ? reports : recentReports;
+    final bool isInfoOnly = reports.length == 1 && reports[0]['category'] == 'Bilgi';
+    final bool hasMore = reports.length > recentReports.length && !isInfoOnly;
+
     return Column(
-      children: reports.map((r) {
-        return Card(
-          color: const Color(0xFF151518),
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            title: Text(r['title'], style: const TextStyle(color: Colors.white)),
-            subtitle: Text(r['date'], style: const TextStyle(color: Colors.white54)),
-            trailing: const Icon(Icons.open_in_new, color: Colors.blueAccent, size: 20),
-            onTap: () async {
-              final url = Uri.parse(r['link'] ?? r['url'] ?? '');
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url);
-              }
-            },
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!_showAllKapReports && recentReports.isEmpty && !isInfoOnly)
+          Container(
+            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E24),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: const Text(
+              'Son 4 gün içerisinde KAP bildirimi bulunmamaktadır.',
+              style: TextStyle(color: Colors.white54, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
           ),
-        );
-      }).toList(),
+        ...displayedReports.map((r) {
+          final category = r['category'] ?? 'KAP Bildirimi';
+          return Card(
+            color: const Color(0xFF151518),
+            margin: const EdgeInsets.only(bottom: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: const BorderSide(color: Colors.white12, width: 1),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF24242A),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.white24, width: 1),
+                        ),
+                        child: Text(
+                          category,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        r['date'] ?? '',
+                        style: const TextStyle(color: Colors.white38, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    r['title'] ?? '',
+                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () async {
+                      final url = Uri.parse(r['link'] ?? r['url'] ?? '');
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url);
+                      }
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Text(
+                          'KAP\'ta Görüntüle',
+                          style: TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w500),
+                        ),
+                        SizedBox(width: 4),
+                        Icon(Icons.open_in_new, color: Colors.white60, size: 14),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+        if (hasMore) ...[
+          const SizedBox(height: 4),
+          Center(
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _showAllKapReports = !_showAllKapReports;
+                });
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF222228),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white24,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _showAllKapReports
+                          ? 'Daha Az Göster (Son 4 Gün)'
+                          : 'Daha Fazla Göster (${reports.length - recentReports.length} Eski Bildirim)',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      _showAllKapReports ? Icons.expand_less : Icons.expand_more,
+                      color: Colors.white70,
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
   

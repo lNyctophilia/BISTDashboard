@@ -289,7 +289,7 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
     <button class="tb-btn" id="btn-macd" title="MACD">MACD</button>
     <button class="tb-btn" id="btn-sr" title="Destek ve Direnç Seviyeleri">D/D</button>
     <button class="tb-btn active" id="btn-grid" title="Izgara">GRID</button>
-    <button class="tb-btn active auto-btn" id="btn-auto" title="Otomatik Fiyat Ölçeği (OTO / Manuel)">OTO</button>
+    <button class="tb-btn auto-btn" id="btn-auto" title="Otomatik Fiyat Ölçeği (OTO / Manuel)">OTO</button>
     <button class="tb-btn reset-btn" id="btn-reset" title="Odakla / Sıfırla">🎯</button>
   </div>
 
@@ -338,7 +338,7 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
       rightPriceScale: {
         borderColor: '#2B2B43',
         visible: true,
-        autoScale: true,
+        autoScale: false,
         scaleMargins: { top: 0.1, bottom: 0.2 },
       },
       timeScale: {
@@ -733,6 +733,10 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
           scaleMargins: { top: 0.1, bottom: 0.2 }
         });
         candleSeries.applyOptions({});
+      } else {
+        chart.priceScale('right').applyOptions({
+          autoScale: false
+        });
       }
     });
 
@@ -740,11 +744,11 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
     document.getElementById('btn-reset').addEventListener('click', () => {
       priceZoomFactor = 1.0;
       chart.priceScale('right').applyOptions({
-        autoScale: true,
+        autoScale: false,
         scaleMargins: { top: 0.1, bottom: 0.2 }
       });
-      if (autoBtn && !autoBtn.classList.contains('active')) {
-        autoBtn.classList.add('active');
+      if (autoBtn && autoBtn.classList.contains('active')) {
+        autoBtn.classList.remove('active');
       }
       candleSeries.applyOptions({});
       chart.timeScale().fitContent();

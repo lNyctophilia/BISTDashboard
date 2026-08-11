@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import pykap
 import time
 import re
-
+import datetime
 import io
 
 router = APIRouter()
@@ -394,37 +394,118 @@ def get_news(symbol: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def is_within_last_days(date_str: str, days: int = 4) -> bool:
+    if not date_str or date_str == '-':
+        return False
+    try:
+        parts = date_str.strip().split(' ')
+        d_parts = parts[0].split('.')
+        if len(d_parts) == 3:
+            day = int(d_parts[0])
+            month = int(d_parts[1])
+            year = int(d_parts[2])
+            pub_date = datetime.date(year, month, day)
+            today = datetime.date.today()
+            return (today - pub_date).days <= days
+    except Exception:
+        pass
+    return False
+
 @router.get("/kap/{symbol}")
 def get_kap_reports(symbol: str):
     """
-    Scrape recent KAP reports for the symbol.
+    Fetch and filter recent KAP disclosures for the symbol into 5 key categories:
+    Özel Durum Açıklaması, Finansal Rapor, Sermaye Artırımı, Pay Geri Alım, Temettü.
     """
     try:
-        clean_symbol = symbol.replace(".IS", "")
+        clean_symbol = symbol.replace(".IS", "").upper()
+        reports = []
         
         try:
             comp = pykap.bist.BISTCompany(ticker=clean_symbol)
-            disclosures = comp.get_disclosures()
+            c_id = comp.company_id
             
-            reports = []
-            for item in disclosures[:5]:  # Get top 5 recent disclosures
-                title = item.get('title', item.get('summary', 'KAP Bildirimi'))
-                date = item.get('publishDate', '')
-                index = item.get('disclosureIndex', '')
-                link = f"https://www.kap.org.tr/tr/Bildirim/{index}" if index else "https://www.kap.org.tr/tr/"
+            today = datetime.date.today()
+            from_date = today - datetime.timedelta(days=180)
+            
+            payload = {
+                'fromDate': str(from_date),
+                'toDate': str(today),
+                'mkkMemberOidList': [c_id],
+                'inactiveMkkMemberOidList': [],
+                'bdkMemberOidList': [],
+                'fromSrc': False,
+                'disclosureIndexList': []
+            }
+            
+            res = requests.post('https://www.kap.org.tr/tr/api/disclosure/members/byCriteria', json=payload, timeout=8)
+            if res.status_code == 200:
+                items = res.json()
                 
-                reports.append({
-                    "title": title,
-                    "date": date,
-                    "link": link
-                })
+                def classify_item(item):
+                    d_class = item.get('disclosureClass', '')
+                    d_type = item.get('disclosureType', '')
+                    text = f"{item.get('title') or ''} {item.get('summary') or ''}".lower()
+                    
+                    if any(k in text for k in ['sermaye art', 'bedelsiz', 'bedelli', 'sermaye azalt', 'hak kullanım']):
+                        return 'Sermaye Artırımı'
+                    if any(k in text for k in ['geri alım', 'geri alim', 'payların geri', 'pay geri']):
+                        return 'Pay Geri Alım'
+                    if any(k in text for k in ['kâr dağıtım', 'kar dagit', 'temettü', 'temettu']):
+                        return 'Temettü / Kâr Dağıtımı'
+                    if d_class == 'FR':
+                        return 'Finansal Rapor'
+                    if d_class == 'ODA' or d_type == 'ODA':
+                        return 'Özel Durum Açıklaması'
+                    return None  # Filter out noise (devre kesici, tescil vb.)
+
+                for item in items:
+                    category = classify_item(item)
+                    if category:
+                        disc_idx = item.get('disclosureIndex', '')
+                        link = f"https://www.kap.org.tr/tr/Bildirim/{disc_idx}" if disc_idx else "https://www.kap.org.tr/tr/"
+                        title = item.get('title') or item.get('summary') or 'KAP Bildirimi'
+                        date = item.get('publishDate', '')
+                        is_recent = is_within_last_days(date, 4)
+                        
+                        reports.append({
+                            "category": category,
+                            "title": title,
+                            "summary": item.get('summary', ''),
+                            "date": date,
+                            "link": link,
+                            "is_recent": is_recent
+                        })
+                        if len(reports) >= 40:  # Return top 40 filtered disclosures
+                            break
+
         except Exception as e:
-            print(f"Pykap error for {clean_symbol}: {e}")
-            reports = []
-            
+            print(f"KAP fetch error for {clean_symbol}: {e}")
+
+        # Fallback to pykap basic disclosures if byCriteria returned nothing
+        if not reports:
+            try:
+                comp = pykap.bist.BISTCompany(ticker=clean_symbol)
+                disclosures = comp.get_disclosures()
+                for item in disclosures[:10]:
+                    title = item.get('title', item.get('summary', 'KAP Bildirimi'))
+                    date = item.get('publishDate', '')
+                    index = item.get('disclosureIndex', '')
+                    link = f"https://www.kap.org.tr/tr/Bildirim/{index}" if index else "https://www.kap.org.tr/tr/"
+                    is_recent = is_within_last_days(date, 4)
+                    reports.append({
+                        "category": "Finansal Rapor",
+                        "title": title,
+                        "date": date,
+                        "link": link,
+                        "is_recent": is_recent
+                    })
+            except Exception as e:
+                print(f"Pykap fallback error for {clean_symbol}: {e}")
+
         if not reports:
             reports = [
-                {"title": f"{clean_symbol} için KAP verisi bulunamadı veya çekilemedi.", "date": "-", "link": "https://www.kap.org.tr/tr/"}
+                {"category": "Bilgi", "title": f"{clean_symbol} için filtrelenmiş KAP bildirimi bulunamadı.", "date": "-", "link": "https://www.kap.org.tr/tr/", "is_recent": True}
             ]
 
         return {
