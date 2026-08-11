@@ -43,7 +43,7 @@ jobs:
       - name: Flutter Web Derle
         run: |
           cd frontend
-          flutter build web --release --base-href "/Finance/"
+          flutter build web --release --base-href "/BISTDashboard/"
 
       - name: Auth Config Kontrolü
         run: |
