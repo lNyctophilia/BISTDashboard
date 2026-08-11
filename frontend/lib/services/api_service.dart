@@ -2,7 +2,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:8001/api';
+  // Can be set via flutter build --dart-define=API_URL=https://your-render-url.onrender.com/api
+  static const String _envUrl = String.fromEnvironment('API_URL');
+  // Canlı Render URL adresi
+  static const String _defaultUrl = 'https://bistdashboard-9pag.onrender.com/api';
+
+  static String get baseUrl => _envUrl.isNotEmpty ? _envUrl : _defaultUrl;
 
   static Future<Map<String, dynamic>?> getQuote(String symbol) async {
     try {
