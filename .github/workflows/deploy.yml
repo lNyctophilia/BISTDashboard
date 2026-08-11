@@ -43,7 +43,7 @@ jobs:
       - name: Flutter Web Derle
         run: |
           cd frontend
-          flutter build web --release --base-href "/BISTDashboard/" --dart-define=API_URL="${{ secrets.RENDER_API_URL }}"
+          flutter build web --release --base-href "/BISTDashboard/" --dart-define=API_URL="https://bistdashboard-9pag.onrender.com/api"
 
       - name: Auth Config Kontrolü
         run: |
