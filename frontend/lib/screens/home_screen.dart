@@ -15,6 +15,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> _watchlist = [];
   Map<String, Map<String, dynamic>> _quotes = {};
   bool _isLoading = false;
+  String _filterQuery = '';
 
   @override
   void initState() {
@@ -78,6 +79,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_watchlist.contains(upperSymbol)) {
       targetController.clear();
       if (mounted) {
+        setState(() {
+          _filterQuery = '';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$upperSymbol zaten listenizde ekli.'),
@@ -95,6 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!_watchlist.contains(upperSymbol)) {
           _watchlist.add(upperSymbol);
         }
+        _filterQuery = '';
       });
       targetController.clear();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -195,16 +200,37 @@ class _HomeScreenState extends State<HomeScreen> {
               focusNode: focusNode,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: 'Hisse Ara (örn. THYAO)...',
+                hintText: 'Hisse Ara veya Filtrele...',
                 hintStyle: const TextStyle(color: Colors.white54),
                 border: InputBorder.none,
                 prefixIcon: const Icon(Icons.search, color: Colors.white54),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.add, color: Colors.blueAccent),
-                  onPressed: () => _addSymbol(textEditingController.text, controller: textEditingController),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (textEditingController.text.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear, color: Colors.white54),
+                        onPressed: () {
+                          textEditingController.clear();
+                          setState(() {
+                            _filterQuery = '';
+                          });
+                        },
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.add, color: Colors.blueAccent),
+                      tooltip: 'Listeye Ekle',
+                      onPressed: () => _addSymbol(textEditingController.text, controller: textEditingController),
+                    ),
+                  ],
                 ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 14),
               ),
+              onChanged: (value) {
+                setState(() {
+                  _filterQuery = value;
+                });
+              },
               onSubmitted: (String value) {
                 onFieldSubmitted();
                 _addSymbol(value, controller: textEditingController);
@@ -265,6 +291,31 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildWatchlist() {
+    final filteredList = _filterQuery.trim().isEmpty
+        ? _watchlist
+        : _watchlist.where((s) => s.contains(_filterQuery.trim().toUpperCase())).toList();
+
+    if (filteredList.isEmpty && _watchlist.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.search_off, color: Colors.grey, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              '"${_filterQuery.trim()}" için listenizde hisse bulunamadı.',
+              style: const TextStyle(color: Colors.grey, fontSize: 15),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Arama kutusundaki + butonuna basarak ekleyebilirsiniz.',
+              style: TextStyle(color: Colors.white38, fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _loadWatchlist,
       color: Colors.blueAccent,
@@ -272,10 +323,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: _watchlist.length,
-      itemBuilder: (context, index) {
-        final symbol = _watchlist[index];
-        final quote = _quotes[symbol];
+        itemCount: filteredList.length,
+        itemBuilder: (context, index) {
+          final symbol = filteredList[index];
+          final quote = _quotes[symbol];
 
         return Card(
           color: const Color(0xFF151518),
@@ -423,7 +474,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 16),
                 const Center(
                   child: Text(
-                    'Versiyon (12.08.2026-18.20)',
+                    'Versiyon (12.08.2026-18.53)',
                     style: TextStyle(color: Colors.white38, fontSize: 12),
                   ),
                 ),
