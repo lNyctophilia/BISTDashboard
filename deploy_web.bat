@@ -10,7 +10,7 @@ FOR /F "tokens=*" %%i IN ('powershell -Command "Get-Date -Format 'dd.MM.yyyy-HH.
 FOR /F "tokens=*" %%i IN ('git remote get-url origin') DO SET remoteUrl=%%i
 
 echo 1. Versiyon numarasi guncelleniyor...
-powershell -Command "(Get-Content 'frontend\lib\screens\home_screen.dart' -Encoding UTF8) -replace 'Versiyon \([^)]+\)', 'Versiyon (%%dateStr%%)' | Set-Content 'frontend\lib\screens\home_screen.dart' -Encoding UTF8"
+powershell -Command "(Get-Content 'frontend\lib\screens\home_screen.dart' -Encoding UTF8) -replace 'Versiyon \([^)]+\)', 'Versiyon (%dateStr%)' | Set-Content 'frontend\lib\screens\home_screen.dart' -Encoding UTF8"
 echo Yeni Versiyon: %dateStr%
 echo.
 

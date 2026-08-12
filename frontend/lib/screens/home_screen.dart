@@ -162,13 +162,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ? const Center(child: Text('Listeniz boş, hisse ekleyin.', style: TextStyle(color: Colors.grey)))
                     : _buildWatchlist(),
           ),
-          const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Text(
-              'Versiyon (%dateStr%)',
-              style: TextStyle(color: Colors.white38, fontSize: 12),
-            ),
-          ),
         ],
       ),
     );
@@ -428,6 +421,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                const Center(
+                  child: Text(
+                    'Versiyon (12.08.2026-18.20)',
+                    style: TextStyle(color: Colors.white38, fontSize: 12),
+                  ),
+                ),
               ],
             ),
           ),

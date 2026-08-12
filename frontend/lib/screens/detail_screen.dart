@@ -20,7 +20,8 @@ class _DetailScreenState extends State<DetailScreen> {
   Map<String, dynamic>? _news;
   Map<String, dynamic>? _kapReports;
   Map<String, dynamic>? _brokerTargets;
-  bool _showAllKapReports = false;
+  int _kapVisibleWeeks = 1;
+  int _newsVisibleWeeks = 1;
   
   List<ChartData>? _chartData;
   String _selectedInterval = '1d';
@@ -75,7 +76,8 @@ class _DetailScreenState extends State<DetailScreen> {
         _news = results[1];
         _kapReports = results[2];
         _brokerTargets = results[3];
-        _showAllKapReports = false;
+        _kapVisibleWeeks = 1;
+        _newsVisibleWeeks = 1;
         if (results[5] != null) {
           _quote = results[5];
         }
@@ -370,24 +372,34 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
-  bool _isWithinLast4Days(String? dateStr) {
-    if (dateStr == null || dateStr.isEmpty || dateStr == '-') return false;
+  int? _getDaysAgo(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty || dateStr == '-') return null;
     try {
-      final parts = dateStr.trim().split(' ');
-      if (parts.isEmpty) return false;
-      final dParts = parts[0].split('.');
-      if (dParts.length == 3) {
-        final day = int.parse(dParts[0]);
-        final month = int.parse(dParts[1]);
-        final year = int.parse(dParts[2]);
-        final pubDate = DateTime(year, month, day);
+      final str = dateStr.trim();
+      final parts = str.split(' ');
+      if (parts.isNotEmpty) {
+        final dParts = parts[0].split('.');
+        if (dParts.length == 3) {
+          final day = int.parse(dParts[0]);
+          final month = int.parse(dParts[1]);
+          final year = int.parse(dParts[2]);
+          final pubDate = DateTime(year, month, day);
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          int diff = today.difference(pubDate).inDays;
+          return diff < 0 ? 0 : diff;
+        }
+      }
+      final parsedIso = DateTime.tryParse(str);
+      if (parsedIso != null) {
         final now = DateTime.now();
         final today = DateTime(now.year, now.month, now.day);
-        final diff = today.difference(pubDate).inDays;
-        return diff >= 0 && diff <= 4;
+        final pubDate = DateTime(parsedIso.year, parsedIso.month, parsedIso.day);
+        int diff = today.difference(pubDate).inDays;
+        return diff < 0 ? 0 : diff;
       }
     } catch (_) {}
-    return false;
+    return null;
   }
 
   Widget _buildKapReportsSection() {
@@ -400,19 +412,23 @@ class _DetailScreenState extends State<DetailScreen> {
       return const Text('KAP verisi bulunamadı.', style: TextStyle(color: Colors.white54));
     }
 
-    final recentReports = reports.where((r) {
-      if (r['is_recent'] == true) return true;
-      return _isWithinLast4Days(r['date']?.toString());
+    final bool isInfoOnly = reports.length == 1 && reports[0]['category'] == 'Bilgi';
+
+    final displayedReports = reports.where((r) {
+      if (isInfoOnly) return true;
+      final daysAgo = _getDaysAgo(r['date']?.toString());
+      if (daysAgo != null) {
+        return daysAgo <= (_kapVisibleWeeks * 7);
+      }
+      return true;
     }).toList();
 
-    final displayedReports = _showAllKapReports ? reports : recentReports;
-    final bool isInfoOnly = reports.length == 1 && reports[0]['category'] == 'Bilgi';
-    final bool hasMore = reports.length > recentReports.length && !isInfoOnly;
+    final bool hasMore = !isInfoOnly && displayedReports.length < reports.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!_showAllKapReports && recentReports.isEmpty && !isInfoOnly)
+        if (displayedReports.isEmpty && !isInfoOnly)
           Container(
             padding: const EdgeInsets.all(14),
             margin: const EdgeInsets.only(bottom: 10),
@@ -421,9 +437,9 @@ class _DetailScreenState extends State<DetailScreen> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: Colors.white12),
             ),
-            child: const Text(
-              'Son 4 gün içerisinde KAP bildirimi bulunmamaktadır.',
-              style: TextStyle(color: Colors.white54, fontSize: 13),
+            child: Text(
+              'Son $_kapVisibleWeeks hafta (${_kapVisibleWeeks * 7} gün) içerisinde KAP bildirimi bulunmamaktadır.',
+              style: const TextStyle(color: Colors.white54, fontSize: 13),
               textAlign: TextAlign.center,
             ),
           ),
@@ -513,7 +529,7 @@ class _DetailScreenState extends State<DetailScreen> {
             child: InkWell(
               onTap: () {
                 setState(() {
-                  _showAllKapReports = !_showAllKapReports;
+                  _kapVisibleWeeks++;
                 });
               },
               borderRadius: BorderRadius.circular(20),
@@ -529,20 +545,18 @@ class _DetailScreenState extends State<DetailScreen> {
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: [
+                  children: const [
                     Text(
-                      _showAllKapReports
-                          ? 'Daha Az Göster (Son 4 Gün)'
-                          : 'Daha Fazla Göster (${reports.length - recentReports.length} Eski Bildirim)',
-                      style: const TextStyle(
+                      'Daha Fazla Göster (+1 Hafta)',
+                      style: TextStyle(
                         color: Colors.white70,
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    SizedBox(width: 6),
                     Icon(
-                      _showAllKapReports ? Icons.expand_less : Icons.expand_more,
+                      Icons.expand_more,
                       color: Colors.white70,
                       size: 18,
                     ),
@@ -562,24 +576,112 @@ class _DetailScreenState extends State<DetailScreen> {
     }
     
     final newsList = _news!['news'] as List;
+    if (newsList.isEmpty) {
+      return const Text('Haber bulunamadı.', style: TextStyle(color: Colors.white54));
+    }
+
+    final bool isInfoOnly = newsList.length == 1 && (newsList[0]['source'] == 'Sistem' || newsList[0]['title'].toString().contains('bulunamadı'));
+
+    final displayedNews = newsList.where((n) {
+      if (isInfoOnly) return true;
+      final daysAgo = _getDaysAgo(n['date']?.toString());
+      if (daysAgo != null) {
+        return daysAgo <= (_newsVisibleWeeks * 7);
+      }
+      return true;
+    }).toList();
+
+    final bool hasMore = !isInfoOnly && displayedNews.length < newsList.length;
+
     return Column(
-      children: newsList.map((n) {
-        return Card(
-          color: const Color(0xFF151518),
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            title: Text(n['title'], style: const TextStyle(color: Colors.white)),
-            subtitle: Text(n['source'], style: const TextStyle(color: Colors.white54)),
-            trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
-            onTap: () async {
-              final url = Uri.parse(n['url'] ?? '');
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url);
-              }
-            },
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (displayedNews.isEmpty && !isInfoOnly)
+          Container(
+            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E24),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Text(
+              'Son $_newsVisibleWeeks hafta (${_newsVisibleWeeks * 7} gün) içerisinde haber bulunmamaktadır.',
+              style: const TextStyle(color: Colors.white54, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
           ),
-        );
-      }).toList(),
+        ...displayedNews.map((n) {
+          final String dateStr = n['date'] != null && n['date'].toString() != '-' ? n['date'].toString() : '';
+          final String subtitleText = dateStr.isNotEmpty ? '${n['source']} • $dateStr' : (n['source'] ?? '');
+
+          return Card(
+            color: const Color(0xFF151518),
+            margin: const EdgeInsets.only(bottom: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: const BorderSide(color: Colors.white12, width: 1),
+            ),
+            child: ListTile(
+              title: Text(n['title'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 14)),
+              subtitle: subtitleText.isNotEmpty ? Text(subtitleText, style: const TextStyle(color: Colors.white54, fontSize: 12)) : null,
+              trailing: const Icon(Icons.open_in_new, color: Colors.white70, size: 18),
+              onTap: () async {
+                final urlStr = n['url'] ?? n['link'] ?? '';
+                if (urlStr.isNotEmpty && urlStr != '#') {
+                  final url = Uri.parse(urlStr);
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(url);
+                  }
+                }
+              },
+            ),
+          );
+        }),
+        if (hasMore) ...[
+          const SizedBox(height: 4),
+          Center(
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _newsVisibleWeeks++;
+                });
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF222228),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white24,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Text(
+                      'Daha Fazla Göster (+1 Hafta)',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    SizedBox(width: 6),
+                    Icon(
+                      Icons.expand_more,
+                      color: Colors.white70,
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

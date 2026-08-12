@@ -377,14 +377,33 @@ def get_news(symbol: str):
             title = content.get("title", "No Title")
             source = content.get("provider", {}).get("displayName", "Yahoo Finance")
             url = content.get("clickThroughUrl", {}).get("url", "#")
+            
+            pub_date = content.get("pubDate") or content.get("displayTime") or item.get("providerPublishTime")
+            date_str = ""
+            if pub_date:
+                if isinstance(pub_date, (int, float)):
+                    dt = datetime.datetime.fromtimestamp(pub_date, datetime.timezone.utc)
+                    date_str = dt.strftime("%d.%m.%Y %H:%M")
+                elif isinstance(pub_date, str):
+                    try:
+                        dt = datetime.datetime.fromisoformat(pub_date.replace("Z", "+00:00"))
+                        date_str = dt.strftime("%d.%m.%Y %H:%M")
+                    except Exception:
+                        date_str = pub_date
+
             if title != "No Title":
-                formatted_news.append({"title": title, "source": source, "url": url})
+                formatted_news.append({
+                    "title": title,
+                    "source": source,
+                    "url": url,
+                    "date": date_str
+                })
         
         # Fallback if no news
         if not formatted_news:
             clean_symbol = symbol.replace(".IS", "")
             formatted_news = [
-                {"title": f"{clean_symbol} hakkında güncel haber bulunamadı.", "source": "Sistem", "url": "#"}
+                {"title": f"{clean_symbol} hakkında güncel haber bulunamadı.", "source": "Sistem", "url": "#", "date": "-"}
             ]
             
         return {
@@ -394,7 +413,7 @@ def get_news(symbol: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def is_within_last_days(date_str: str, days: int = 4) -> bool:
+def is_within_last_days(date_str: str, days: int = 7) -> bool:
     if not date_str or date_str == '-':
         return False
     try:
@@ -466,7 +485,7 @@ def get_kap_reports(symbol: str):
                         link = f"https://www.kap.org.tr/tr/Bildirim/{disc_idx}" if disc_idx else "https://www.kap.org.tr/tr/"
                         title = item.get('title') or item.get('summary') or 'KAP Bildirimi'
                         date = item.get('publishDate', '')
-                        is_recent = is_within_last_days(date, 4)
+                        is_recent = is_within_last_days(date, 7)
                         
                         reports.append({
                             "category": category,
@@ -492,7 +511,7 @@ def get_kap_reports(symbol: str):
                     date = item.get('publishDate', '')
                     index = item.get('disclosureIndex', '')
                     link = f"https://www.kap.org.tr/tr/Bildirim/{index}" if index else "https://www.kap.org.tr/tr/"
-                    is_recent = is_within_last_days(date, 4)
+                    is_recent = is_within_last_days(date, 7)
                     reports.append({
                         "category": "Finansal Rapor",
                         "title": title,

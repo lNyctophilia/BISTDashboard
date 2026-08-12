@@ -64,10 +64,12 @@ class NativeChartWidget extends StatefulWidget {
 class _NativeChartWidgetState extends State<NativeChartWidget> {
   late String _viewType;
   StreamSubscription? _msgSub;
+  html.IFrameElement? _iframe;
 
   @override
   void initState() {
     super.initState();
+    _viewType = 'tv-lw-chart-${widget.symbol}-${identityHashCode(this)}';
     _registerView();
     _listenToMessages();
   }
@@ -75,10 +77,11 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
   @override
   void didUpdateWidget(covariant NativeChartWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.symbol != widget.symbol ||
-        oldWidget.data != widget.data ||
-        oldWidget.selectedInterval != widget.selectedInterval) {
+    if (oldWidget.symbol != widget.symbol) {
+      _viewType = 'tv-lw-chart-${widget.symbol}-${identityHashCode(this)}';
       _registerView();
+    } else if (oldWidget.data != widget.data || oldWidget.selectedInterval != widget.selectedInterval) {
+      _sendUpdateMessage();
     }
   }
 
@@ -86,6 +89,37 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
   void dispose() {
     _msgSub?.cancel();
     super.dispose();
+  }
+
+  void _sendUpdateMessage() {
+    if (_iframe == null || _iframe!.contentWindow == null) return;
+
+    final jsonList = widget.data.map((e) => {
+      'time': e.time.millisecondsSinceEpoch,
+      'open': e.open,
+      'high': e.high,
+      'low': e.low,
+      'close': e.close,
+      'volume': e.volume,
+      'ema': e.ema,
+      'sma_50': e.sma50,
+      'volume_ma': e.volumeMa,
+      'bollinger_upper': e.bollingerUpper,
+      'bollinger_middle': e.bollingerMiddle,
+      'bollinger_lower': e.bollingerLower,
+      'rsi': e.rsi,
+      'macd': e.macd,
+      'macd_signal': e.macdSignal,
+      'macd_hist': e.macdHist,
+    }).toList();
+
+    final message = jsonEncode({
+      'type': 'UPDATE_DATA',
+      'data': jsonList,
+      'interval': widget.selectedInterval,
+    });
+
+    _iframe!.contentWindow!.postMessage(message, '*');
   }
 
   void _listenToMessages() {
@@ -105,8 +139,6 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
   }
 
   void _registerView() {
-    _viewType = 'tv-lw-chart-${widget.symbol}-${DateTime.now().microsecondsSinceEpoch}';
-
     final jsonList = widget.data.map((e) => {
       'time': e.time.millisecondsSinceEpoch,
       'open': e.open,
@@ -320,7 +352,7 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
     <button class="tb-btn" id="btn-macd" title="MACD">MACD</button>
     <button class="tb-btn" id="btn-sr" title="Destek ve Direnç Seviyeleri">D/D</button>
     <button class="tb-btn active" id="btn-grid" title="Izgara">GRID</button>
-    <button class="tb-btn auto-btn" id="btn-auto" title="Otomatik Fiyat Ölçeği (OTO / Manuel)">OTO</button>
+    <button class="tb-btn auto-btn active" id="btn-auto" title="Otomatik Fiyat Ölçeği (OTO / Manuel)">OTO</button>
     <button class="tb-btn reset-btn" id="btn-reset" title="Odakla / Sıfırla">🎯</button>
   </div>
 
@@ -343,15 +375,14 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
   <script>
     const rawData = $jsonString;
     const symbol = "$cleanSymbol";
-    const currentInterval = "$currentInterval";
+    let currentInterval = "$currentInterval";
 
     const container = document.getElementById('tv-chart');
     const legend = document.getElementById('legend');
     const autoBtn = document.getElementById('btn-auto');
 
     let priceZoomFactor = 1.0;
-
-    const isIntraday = currentInterval === '1h' || currentInterval === '4h';
+    let isIntraday = currentInterval === '1h' || currentInterval === '4h';
 
     const chart = LightweightCharts.createChart(container, {
       layout: {
@@ -371,8 +402,8 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
       rightPriceScale: {
         borderColor: '#2B2B43',
         visible: true,
-        autoScale: false,
-        scaleMargins: { top: 0.15, bottom: 0.15 },
+        autoScale: true,
+        scaleMargins: { top: 0.1, bottom: 0.2 },
       },
       timeScale: {
         borderColor: '#2B2B43',
@@ -389,7 +420,7 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
         mouseWheel: true,
         pressedMove: true,
         horzTouchDrag: true,
-        vertTouchDrag: false,
+        vertTouchDrag: true,
       },
       handleScale: {
         axisPressedMove: true,
@@ -602,70 +633,81 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
       }));
     }
 
-    // Sort & Transform Data
-    const sortedData = (rawData || []).sort((a, b) => a.time - b.time);
-    
-    // Deduplicate timestamps if any
-    const uniqueMap = new Map();
-    sortedData.forEach(d => {
-      const tSec = Math.floor(d.time / 1000);
-      if (!uniqueMap.has(tSec)) {
-        uniqueMap.set(tSec, d);
-      }
-    });
+    let candles = [];
 
-    const candles = [];
-    const volumes = [];
-    const emas = [];
-    const smas = [];
-    const bbUpper = [];
-    const bbMiddle = [];
-    const bbLower = [];
-    const rsis = [];
-    const macds = [];
-    const macdSignals = [];
-    const macdHists = [];
-
-    uniqueMap.forEach((d, tSec) => {
-      candles.push({ time: tSec, open: d.open, high: d.high, low: d.low, close: d.close });
-      volumes.push({
-        time: tSec,
-        value: d.volume,
-        color: d.close >= d.open ? 'rgba(8, 153, 129, 0.4)' : 'rgba(242, 54, 69, 0.4)'
+    function processChartData(dataList) {
+      const sortedData = (dataList || []).sort((a, b) => a.time - b.time);
+      
+      const uniqueMap = new Map();
+      sortedData.forEach(d => {
+        const tSec = Math.floor(d.time / 1000);
+        if (!uniqueMap.has(tSec)) {
+          uniqueMap.set(tSec, d);
+        }
       });
 
-      if (d.ema !== null && d.ema !== undefined) emas.push({ time: tSec, value: d.ema });
-      if (d.sma_50 !== null && d.sma_50 !== undefined) smas.push({ time: tSec, value: d.sma_50 });
+      const newCandles = [];
+      const volumes = [];
+      const emas = [];
+      const smas = [];
+      const bbUpper = [];
+      const bbMiddle = [];
+      const bbLower = [];
+      const rsis = [];
+      const macds = [];
+      const macdSignals = [];
+      const macdHists = [];
 
-      if (d.bollinger_upper !== null && d.bollinger_upper !== undefined) bbUpper.push({ time: tSec, value: d.bollinger_upper });
-      if (d.bollinger_middle !== null && d.bollinger_middle !== undefined) bbMiddle.push({ time: tSec, value: d.bollinger_middle });
-      if (d.bollinger_lower !== null && d.bollinger_lower !== undefined) bbLower.push({ time: tSec, value: d.bollinger_lower });
-
-      if (d.rsi !== null && d.rsi !== undefined) rsis.push({ time: tSec, value: d.rsi });
-
-      if (d.macd !== null && d.macd !== undefined) macds.push({ time: tSec, value: d.macd });
-      if (d.macd_signal !== null && d.macd_signal !== undefined) macdSignals.push({ time: tSec, value: d.macd_signal });
-      if (d.macd_hist !== null && d.macd_hist !== undefined) {
-        macdHists.push({
+      uniqueMap.forEach((d, tSec) => {
+        newCandles.push({ time: tSec, open: d.open, high: d.high, low: d.low, close: d.close });
+        volumes.push({
           time: tSec,
-          value: d.macd_hist,
-          color: d.macd_hist >= 0 ? 'rgba(8, 153, 129, 0.7)' : 'rgba(242, 54, 69, 0.7)'
+          value: d.volume,
+          color: d.close >= d.open ? 'rgba(8, 153, 129, 0.4)' : 'rgba(242, 54, 69, 0.4)'
         });
+
+        if (d.ema !== null && d.ema !== undefined) emas.push({ time: tSec, value: d.ema });
+        if (d.sma_50 !== null && d.sma_50 !== undefined) smas.push({ time: tSec, value: d.sma_50 });
+
+        if (d.bollinger_upper !== null && d.bollinger_upper !== undefined) bbUpper.push({ time: tSec, value: d.bollinger_upper });
+        if (d.bollinger_middle !== null && d.bollinger_middle !== undefined) bbMiddle.push({ time: tSec, value: d.bollinger_middle });
+        if (d.bollinger_lower !== null && d.bollinger_lower !== undefined) bbLower.push({ time: tSec, value: d.bollinger_lower });
+
+        if (d.rsi !== null && d.rsi !== undefined) rsis.push({ time: tSec, value: d.rsi });
+
+        if (d.macd !== null && d.macd !== undefined) macds.push({ time: tSec, value: d.macd });
+        if (d.macd_signal !== null && d.macd_signal !== undefined) macdSignals.push({ time: tSec, value: d.macd_signal });
+        if (d.macd_hist !== null && d.macd_hist !== undefined) {
+          macdHists.push({
+            time: tSec,
+            value: d.macd_hist,
+            color: d.macd_hist >= 0 ? 'rgba(8, 153, 129, 0.7)' : 'rgba(242, 54, 69, 0.7)'
+          });
+        }
+      });
+
+      candles = newCandles;
+
+      candleSeries.setData(candles);
+      volumeSeries.setData(volumes);
+      emaSeries.setData(emas);
+      smaSeries.setData(smas);
+      bbUpperSeries.setData(bbUpper);
+      bbMiddleSeries.setData(bbMiddle);
+      bbLowerSeries.setData(bbLower);
+      rsiSeries.setData(rsis);
+      macdSeries.setData(macds);
+      macdSignalSeries.setData(macdSignals);
+      macdHistSeries.setData(macdHists);
+
+      const btnSr = document.getElementById('btn-sr');
+      if (btnSr && btnSr.classList.contains('active')) {
+        computeAndDrawSR();
       }
-    });
+    }
 
-    candleSeries.setData(candles);
-    volumeSeries.setData(volumes);
-    emaSeries.setData(emas);
-    smaSeries.setData(smas);
-    bbUpperSeries.setData(bbUpper);
-    bbMiddleSeries.setData(bbMiddle);
-    bbLowerSeries.setData(bbLower);
-    rsiSeries.setData(rsis);
-    macdSeries.setData(macds);
-    macdSignalSeries.setData(macdSignals);
-    macdHistSeries.setData(macdHists);
-
+    // Initial data load
+    processChartData(rawData);
     chart.timeScale().fitContent();
 
     // Resize Handling
@@ -824,29 +866,46 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
     document.getElementById('btn-reset').addEventListener('click', () => {
       priceZoomFactor = 1.0;
       chart.priceScale('right').applyOptions({
-        autoScale: false,
+        autoScale: true,
         scaleMargins: { top: 0.1, bottom: 0.2 }
       });
-      if (autoBtn && autoBtn.classList.contains('active')) {
-        autoBtn.classList.remove('active');
+      if (autoBtn && !autoBtn.classList.contains('active')) {
+        autoBtn.classList.add('active');
       }
       candleSeries.applyOptions({});
       chart.timeScale().fitContent();
     });
 
-    // Mousedown listener to detect left-click drag on price scale
-    container.addEventListener('mousedown', (e) => {
+    // Detect click / drag on right price scale axis to disable auto mode
+    function handleAxisInteraction(x) {
       const rect = container.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const isRightAxis = mouseX >= (rect.width - 85);
-
+      const isRightAxis = x >= (rect.width - 85);
       if (isRightAxis) {
         if (autoBtn && autoBtn.classList.contains('active')) {
           autoBtn.classList.remove('active');
         }
         chart.priceScale('right').applyOptions({ autoScale: false });
       }
+    }
+
+    container.addEventListener('mousedown', (e) => {
+      const rect = container.getBoundingClientRect();
+      handleAxisInteraction(e.clientX - rect.left);
     });
+
+    container.addEventListener('touchstart', (e) => {
+      if (e.touches && e.touches.length > 0) {
+        const rect = container.getBoundingClientRect();
+        handleAxisInteraction(e.touches[0].clientX - rect.left);
+      }
+    }, { passive: true });
+
+    container.addEventListener('touchmove', (e) => {
+      if (e.touches && e.touches.length > 0) {
+        const rect = container.getBoundingClientRect();
+        handleAxisInteraction(e.touches[0].clientX - rect.left);
+      }
+    }, { passive: true });
 
     // Vertical (Price Scale) Wheel Interactions (Capture Phase)
     container.addEventListener('wheel', (e) => {
@@ -875,25 +934,47 @@ class _NativeChartWidgetState extends State<NativeChartWidget> {
           }
         }
 
-        // Strictly keep autoScale: false so horizontal date scrolling DOES NOT auto-scale!
         chart.priceScale('right').applyOptions({ autoScale: false });
         candleSeries.applyOptions({});
       }
     }, { capture: true, passive: false });
+
+    // In-place postMessage Update Listener
+    window.addEventListener('message', (event) => {
+      try {
+        let msg = event.data;
+        if (typeof msg === 'string') {
+          msg = JSON.parse(msg);
+        }
+        if (msg && msg.type === 'UPDATE_DATA' && Array.isArray(msg.data)) {
+          if (msg.interval) {
+            currentInterval = msg.interval;
+            isIntraday = currentInterval === '1h' || currentInterval === '4h';
+            chart.timeScale().applyOptions({ timeVisible: isIntraday });
+            const tfSel = document.getElementById('tf-select');
+            if (tfSel && tfSel.value !== currentInterval) {
+              tfSel.value = currentInterval;
+            }
+          }
+          processChartData(msg.data);
+          updateLegend({});
+        }
+      } catch (_) {}
+    });
   </script>
 </body>
 </html>
 ''';
 
-    final iframe = html.IFrameElement()
+    _iframe = html.IFrameElement()
       ..width = '100%'
       ..height = '100%'
-      ..src = 'data:text/html;charset=utf-8,' + Uri.encodeComponent(chartHtml)
+      ..src = 'data:text/html;charset=utf-8,${Uri.encodeComponent(chartHtml)}'
       ..style.border = 'none';
 
     ui_web.platformViewRegistry.registerViewFactory(
       _viewType,
-      (int viewId) => iframe,
+      (int viewId) => _iframe!,
     );
   }
 
