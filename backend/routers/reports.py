@@ -4,6 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 import pykap
 import time
+import random
 import re
 import datetime
 import io
@@ -45,6 +46,7 @@ def fetch_fintables_summary(symbol: str):
                 
                 current_price = None
                 try:
+                    time.sleep(random.uniform(0.3, 0.8))
                     t = yf.Ticker(f"{clean_sym}.IS")
                     fast = t.fast_info
                     current_price = getattr(fast, 'last_price', None) or getattr(fast, 'previous_close', None)
@@ -205,6 +207,7 @@ def get_broker_targets(symbol: str):
         
         # Keep consensus target (from Yahoo Finance or Fintables average)
         try:
+            time.sleep(random.uniform(0.3, 0.8))
             yf_symbol = f"{clean_symbol}.IS"
             ticker = yf.Ticker(yf_symbol)
             mean_target = ticker.info.get("targetMeanPrice")
@@ -247,8 +250,6 @@ def get_broker_targets(symbol: str):
             "summary": fintables_summary,
             "targets": targets
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -109,6 +109,7 @@ def get_batch_quotes(symbols: str):
     yf_symbols = [f"{clean_map[s]}.IS" for s in sym_list]
 
     try:
+        time.sleep(random.uniform(0.3, 0.8))  # Random delay to prevent rate limiting
         df = yf.download(yf_symbols, period="5d", group_by="ticker", threads=True, progress=False)
 
         results = {}
@@ -165,7 +166,7 @@ def get_quote(symbol: str):
         ticker = yf.Ticker(yf_symbol)
         
         # Get today's data
-        time.sleep(random.uniform(0.1, 0.5))  # Random delay to prevent rate limiting
+        time.sleep(random.uniform(0.3, 0.8))  # Random delay to prevent rate limiting
         hist = ticker.history(period="5d")
         hist = hist.dropna(subset=['Close'])
         if hist.empty or len(hist) < 1:
@@ -205,8 +206,6 @@ def get_signals(symbol: str):
         tv_symbol = _clean_symbol(symbol)
         
         intervals = {
-            "15 Dakika": Interval.INTERVAL_15_MINUTES,
-            "1 Saat": Interval.INTERVAL_1_HOUR,
             "4 Saat": Interval.INTERVAL_4_HOURS,
             "Günlük": Interval.INTERVAL_1_DAY,
             "Haftalık": Interval.INTERVAL_1_WEEK,
@@ -253,7 +252,7 @@ def get_chart_data(symbol: str, interval: str = "1d"):
         ticker = yf.Ticker(yf_symbol)
         
         # Define period based on interval and handle 4h resampling
-        time.sleep(random.uniform(0.1, 0.5))  # Random delay to prevent rate limiting
+        time.sleep(random.uniform(0.3, 0.8))  # Random delay to prevent rate limiting
         if interval == "4h":
             hist = ticker.history(period="1y", interval="1h")
             if not hist.empty:
