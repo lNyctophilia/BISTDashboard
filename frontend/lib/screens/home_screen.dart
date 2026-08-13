@@ -538,7 +538,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 16),
                 const Center(
                   child: Text(
-                    'Versiyon (13.08.2026-09.40)',
+                    'Versiyon (13.08.2026-09.47)',
                     style: TextStyle(color: Colors.white38, fontSize: 12),
                   ),
                 ),
