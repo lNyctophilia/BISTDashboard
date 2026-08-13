@@ -24,15 +24,17 @@ def fetch_fintables_summary(symbol: str):
             return cached['data']
             
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
         'Accept': 'application/json, text/plain, */*',
-        'Referer': 'https://fintables.com/'
+        'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Referer': f'https://fintables.com/sirketler/{clean_sym}/analist-tavsiyeleri',
+        'Origin': 'https://fintables.com'
     }
     
     summary = None
     try:
         url = f"https://api.fintables.com/analyst-ratings/?code={clean_sym}"
-        res = requests.get(url, headers=headers, timeout=6)
+        res = requests.get(url, headers=headers, timeout=10)
         if res.status_code == 200:
             data = res.json()
             results = data.get('results', [])
@@ -88,15 +90,17 @@ def fetch_fintables_news(symbol: str):
             return cached['data']
             
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
         'Accept': 'application/json, text/plain, */*',
-        'Referer': 'https://fintables.com/'
+        'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Referer': f'https://fintables.com/sirketler/{clean_sym}/akis',
+        'Origin': 'https://fintables.com'
     }
     
     formatted_news = []
     try:
         url = f"https://api.fintables.com/topic-feed/?symbols={clean_sym}&page_size=40"
-        res = requests.get(url, headers=headers, timeout=6)
+        res = requests.get(url, headers=headers, timeout=10)
         if res.status_code == 200:
             data = res.json()
             raw_results = data.get("results", [])
@@ -112,7 +116,7 @@ def fetch_fintables_news(symbol: str):
                     highlight is True or 
                     pinned is True or 
                     importance in ['high', 'mid'] or 
-                    item_type in ['post', 'article']
+                    item_type in ['post', 'article', 'news']
                 )
                 
                 if not is_featured:
