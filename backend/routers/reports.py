@@ -70,7 +70,8 @@ def fetch_fintables_summary(symbol: str):
     except Exception as e:
         print(f"Fintables analyst ratings error for {clean_sym}: {e}")
         
-    _fintables_cache[clean_sym] = {'timestamp': now, 'data': summary}
+    if summary is not None:
+        _fintables_cache[clean_sym] = {'timestamp': now, 'data': summary}
     return summary
 
 
@@ -171,7 +172,9 @@ def fetch_fintables_news(symbol: str):
     except Exception as e:
         print(f"Fintables news fetch error for {clean_sym}: {e}")
         
-    if not formatted_news:
+    if formatted_news:
+        _news_cache[clean_sym] = {'timestamp': now, 'data': formatted_news}
+    else:
         formatted_news = [
             {
                 "title": f"{clean_sym} için öne çıkan güncel haber bulunamadı.",
@@ -182,7 +185,6 @@ def fetch_fintables_news(symbol: str):
             }
         ]
         
-    _news_cache[clean_sym] = {'timestamp': now, 'data': formatted_news}
     return formatted_news
 
 @router.get("/news/{symbol}")
