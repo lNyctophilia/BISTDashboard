@@ -70,19 +70,6 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>?> getKapReports(String symbol) async {
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/kap/$symbol'));
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      }
-      return null;
-    } catch (e) {
-      print('Error fetching KAP: $e');
-      return null;
-    }
-  }
-
   static Future<Map<String, dynamic>?> getBrokerTargets(String symbol) async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/broker-targets/$symbol'));

@@ -10,526 +10,185 @@ import io
 
 router = APIRouter()
 
-# Global caches with 1 hour TTL
-_ak_cache = {'timestamp': 0, 'data': {}}
-_ziraat_cache = {'timestamp': 0, 'data': {}}
-_yky_cache = {'timestamp': 0, 'data': {}}
-_deniz_cache = {'timestamp': 0, 'data': {}}
-_tera_cache = {'timestamp': 0, 'data': {}}
-_hsbc_cache = {'timestamp': 0, 'data': {}}
+# Fintables summary cache with 1 hour TTL
+_fintables_cache = {}
 
-def fetch_ak_targets():
+def fetch_fintables_summary(symbol: str):
     now = time.time()
-    if now - _ak_cache['timestamp'] < 3600 and _ak_cache['data']:
-        return _ak_cache['data']
-        
-    targets = {}
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-    try:
-        ak_api_url = 'https://www.akyatirim.com.tr/umbraco/surface/api/ModelPortfoyView?son_donem=true&gecikmeli_fiyat=true'
-        ak_res = requests.get(ak_api_url, headers=headers, timeout=5)
-        
-        if ak_res.status_code != 200:
-            ak_page_res = requests.get('https://www.akyatirim.com.tr/tr/raporlarimiz/model-portfoy', headers=headers, timeout=5)
-            if ak_page_res.status_code == 200:
-                ak_match = re.search(r'(/umbraco/surface/api/ModelPortfoyView[^\'"\s]*)', ak_page_res.text)
-                if ak_match:
-                    ak_endpoint = ak_match.group(1)
-                    ak_res = requests.get(f'https://www.akyatirim.com.tr{ak_endpoint}', headers=headers, timeout=5)
-
-        if ak_res.status_code == 200:
-            ak_data = ak_res.json()
-            ak_hisses = []
-            if isinstance(ak_data, dict) and 'datas' in ak_data and ak_data['datas']:
-                ak_hisses = ak_data['datas'][0].get('hisses', [])
-            elif isinstance(ak_data, dict) and 'data' in ak_data:
-                ak_hisses = ak_data['data']
-            elif isinstance(ak_data, list):
-                ak_hisses = ak_data
-
-            for h in ak_hisses:
-                sym = (h.get('sembol') or h.get('Symbol') or h.get('symbol') or h.get('Hisse') or h.get('hisse') or '').upper().strip()
-                target = h.get('hedef_fiyat') or h.get('HedefFiyat') or h.get('targetPrice')
-                entry_date = h.get('portfoy_giris_tarihi') or h.get('PortfoyGirisTarihi') or ''
-                if sym and target is not None:
-                    try:
-                        target_val = float(target)
-                        if target_val > 0:
-                            dt_str = str(entry_date).split('T')[0] if 'T' in str(entry_date) else str(entry_date)
-                            targets[sym] = {
-                                "broker": "Ak Yatırım",
-                                "target_price": round(target_val, 2),
-                                "recommendation": "Al",
-                                "date": dt_str if dt_str else "Güncel"
-                            }
-                    except (ValueError, TypeError):
-                        pass
-    except Exception as e:
-        print(f"Ak Yatirim scrape error: {e}")
-
-    if targets:
-        _ak_cache['timestamp'] = now
-        _ak_cache['data'] = targets
-
-    return _ak_cache['data']
-
-
-def fetch_ziraat_targets():
-    now = time.time()
-    if now - _ziraat_cache['timestamp'] < 3600 and _ziraat_cache['data']:
-        return _ziraat_cache['data']
-        
-    targets = {}
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-    categories = ['39328', '39327']  # 39328: Öneri Portföyü / Raporlar, 39327: Haftalık Teknik Öneriler
+    clean_sym = symbol.replace(".IS", "").upper()
     
-    for cat_id in categories:
-        try:
-            payload = {
-                'BeginDate': '2020-01-01',
-                'EndDate': '2030-01-01',
-                'Page': 1,
-                'PageSize': 5,
-                'SearchTerm': None,
-                'CategoryId': cat_id,
-                'CheckSubCategory': 'False'
-            }
-            res = requests.post('https://www.ziraatyatirim.com.tr/umbraco/api/ClockworkUploaderPublic/GetFilesByFilter', json=payload, headers=headers, timeout=5)
-            if res.status_code == 200:
-                soup = BeautifulSoup(res.text, 'html.parser')
-                pdf_links = []
-                for a in soup.find_all('a', href=True):
-                    href = a['href']
-                    if href.lower().endswith('.pdf'):
-                        if not href.startswith('http'):
-                            href = f'https://www.ziraatyatirim.com.tr{href}'
-                        pdf_links.append(href)
-                
-                for pdf_url in pdf_links[:2]:
-                    pdf_res = requests.get(pdf_url, headers=headers, timeout=6)
-                    if pdf_res.status_code == 200:
-                        import pdfplumber
-                        with pdfplumber.open(io.BytesIO(pdf_res.content)) as pdf:
-                            full_text = ''
-                            for page in pdf.pages:
-                                full_text += (page.extract_text() or '') + '\n'
-                            
-                            for line in full_text.splitlines():
-                                match = re.search(r'\b([A-Z]{4,5})\b\s+(\d{1,2}\.\d{2}\.\d{4})\b.*?\b(AL|EKLE|TUT|SAT)\b\s+([\d\.\,]+)', line, re.IGNORECASE)
-                                if match:
-                                    sym, date_str, rec, price_str = match.groups()
-                                    s_upper = sym.upper().strip()
-                                    if s_upper not in targets:
-                                        try:
-                                            price = float(price_str.replace('.', '').replace(',', '.'))
-                                            targets[s_upper] = {
-                                                'broker': 'Ziraat Yatırım',
-                                                'target_price': round(price, 2),
-                                                'recommendation': rec.strip().capitalize(),
-                                                'date': date_str
-                                            }
-                                        except (ValueError, TypeError):
-                                            pass
-                if targets:
-                    break
-        except Exception as e:
-            print(f"Ziraat Yatirim scrape error (cat {cat_id}): {e}")
-
-    if targets:
-        _ziraat_cache['timestamp'] = now
-        _ziraat_cache['data'] = targets
-
-    return _ziraat_cache['data']
-
-
-def fetch_yky_targets():
-    now = time.time()
-    if now - _yky_cache['timestamp'] < 3600 and _yky_cache['data']:
-        return _yky_cache['data']
-
-    targets = {}
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-    try:
-        url = 'https://www.ykyatirim.com.tr/DetailPage/GetModelPortfolio'
-        res = requests.get(url, headers=headers, timeout=5)
-        
-        # Fallback if URL changes
-        if res.status_code != 200:
-            page_res = requests.get('https://www.ykyatirim.com.tr/hizmetler/arastirma/model-portfoy-hisse-senedi-onerileri', headers=headers, timeout=5)
-            if page_res.status_code == 200:
-                match = re.search(r'fetch\(["\'](/DetailPage/GetModelPortfolio[^"\'\s]*)["\']\)', page_res.text)
-                if match:
-                    endpoint = match.group(1)
-                    res = requests.get(f'https://www.ykyatirim.com.tr{endpoint}', headers=headers, timeout=5)
-
-        if res.status_code == 200:
-            data = res.json()
-            if isinstance(data, list):
-                for item in data:
-                    sym = (item.get('instrument') or item.get('label') or '').upper().strip()
-                    target = item.get('targetPrice')
-                    p_date = item.get('proposeDate') or ''
-                    if sym and target is not None:
-                        try:
-                            target_val = float(target)
-                            if target_val > 0:
-                                dt_str = str(p_date).split('T')[0] if 'T' in str(p_date) else str(p_date)
-                                targets[sym] = {
-                                    "broker": "Yapı Kredi Yatırım",
-                                    "target_price": round(target_val, 2),
-                                    "recommendation": "Al",
-                                    "date": dt_str if dt_str else "Güncel"
-                                }
-                        except (ValueError, TypeError):
-                            pass
-    except Exception as e:
-        print(f"Yapi Kredi Yatirim scrape error: {e}")
-
-    if targets:
-        _yky_cache['timestamp'] = now
-        _yky_cache['data'] = targets
-
-    return _yky_cache['data']
-
-
-def fetch_deniz_targets():
-    now = time.time()
-    if now - _deniz_cache['timestamp'] < 3600 and _deniz_cache['data']:
-        return _deniz_cache['data']
-
-    targets = {}
+    if clean_sym in _fintables_cache:
+        cached = _fintables_cache[clean_sym]
+        if now - cached['timestamp'] < 3600:
+            return cached['data']
+            
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'tr-TR,tr;q=0.9'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Referer': 'https://fintables.com/'
     }
+    
+    summary = None
     try:
-        url = 'https://www.denizyatirim.com/ModelPortfoyPerformans'
+        url = f"https://api.fintables.com/analyst-ratings/?code={clean_sym}"
         res = requests.get(url, headers=headers, timeout=6)
-        if res.status_code == 200:
-            soup = BeautifulSoup(res.text, 'html.parser')
-            text = soup.get_text()
-            matches = re.findall(r'([A-Z]{4,5})(\d+\.\d{2})(\d+%)', text)
-            for sym, price_str, pot in matches:
-                if sym not in ['BIST', 'EURO', 'EUR', 'USD', 'MP', 'BIST100']:
-                    try:
-                        price = float(price_str)
-                        targets[sym] = {
-                            "broker": "Deniz Yatırım",
-                            "target_price": round(price, 2),
-                            "recommendation": "Al",
-                            "date": "Güncel"
-                        }
-                    except (ValueError, TypeError):
-                        pass
-    except Exception as e:
-        print(f"Deniz Yatirim scrape error: {e}")
-
-    if targets:
-        _deniz_cache['timestamp'] = now
-        _deniz_cache['data'] = targets
-
-    return _deniz_cache['data']
-
-
-def fetch_tera_targets():
-    now = time.time()
-    if now - _tera_cache['timestamp'] < 3600 and _tera_cache['data']:
-        return _tera_cache['data']
-
-    targets = {}
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-    try:
-        # Step 1: Get index page to find the latest dated report
-        index_url = 'https://www.terayatirim.com/arastirma/oneri-listemiz'
-        res = requests.get(index_url, headers=headers, timeout=5)
-        latest_report_url = None
-        report_date_str = 'Güncel'
-        
-        if res.status_code == 200:
-            soup = BeautifulSoup(res.text, 'html.parser')
-            for a in soup.find_all('a', href=True):
-                href = a['href']
-                if '/arastirma/oneri-listemiz/' in href:
-                    if not href.startswith('http'):
-                        href = 'https://www.terayatirim.com/' + href.lstrip('./')
-                    latest_report_url = href
-                    date_match = re.search(r'(\d{4}-\d{2}-\d{2})', href)
-                    if date_match:
-                        report_date_str = date_match.group(1)
-                    break
-        
-        if not latest_report_url:
-            latest_report_url = 'https://www.terayatirim.com/arastirma/oneri-listemiz'
-
-        # Step 2: Get latest report page to find PDF link
-        pdf_url = 'https://www.terayatirim.com/dosyalar/arastirma/Model_Portfoey.pdf'
-        r_page = requests.get(latest_report_url, headers=headers, timeout=5)
-        if r_page.status_code == 200:
-            soup_p = BeautifulSoup(r_page.text, 'html.parser')
-            for a in soup_p.find_all('a', href=True):
-                href = a['href']
-                if href.lower().endswith('.pdf') and 'arastirma' in href.lower():
-                    if not href.startswith('http'):
-                        href = 'https://www.terayatirim.com/' + href.lstrip('./')
-                    pdf_url = href
-                    break
-
-        # Step 3: Download and parse PDF
-        r_pdf = requests.get(pdf_url, headers=headers, timeout=8)
-        if r_pdf.status_code == 200:
-            import pdfplumber
-            with pdfplumber.open(io.BytesIO(r_pdf.content)) as pdf:
-                for page in pdf.pages:
-                    words = page.extract_words()
-                    rows = {}
-                    for w in words:
-                        top_key = round(w['top'] / 3) * 3
-                        rows.setdefault(top_key, []).append(w['text'])
-                    
-                    for k in sorted(rows.keys()):
-                        raw_line = ''.join(''.join(rows[k]).split())
-                        match = re.search(r'^([A-Z]{4,5}).*?(\d+,\d{2})(\d+,\d{2})(\d+,\d)%$', raw_line)
-                        if match:
-                            sym, last_p, target_p, pot = match.groups()
-                            try:
-                                target = float(target_p.replace(',', '.'))
-                                pot_clean = pot.replace(',', '.')
-                                targets[sym] = {
-                                    'broker': 'Tera Yatırım',
-                                    'target_price': round(target, 2),
-                                    'recommendation': 'Al',
-                                    'date': report_date_str
-                                }
-                            except (ValueError, TypeError):
-                                pass
-    except Exception as e:
-        print(f"Tera Yatirim scrape error: {e}")
-
-    if targets:
-        _tera_cache['timestamp'] = now
-        _tera_cache['data'] = targets
-
-    return _tera_cache['data']
-
-
-def fetch_hsbc_targets():
-    now = time.time()
-    if now - _hsbc_cache['timestamp'] < 3600 and _hsbc_cache['data']:
-        return _hsbc_cache['data']
-
-    targets = {}
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-    try:
-        url = 'https://api.fintables.com/analyst-ratings/?brokerage_id=HSY'
-        res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
             data = res.json()
             results = data.get('results', [])
-            for item in results:
-                sym = (item.get('code') or '').upper().strip()
-                price_target = item.get('price_target')
-                rec_type = (item.get('type') or 'al').strip().capitalize()
-                pub_date = item.get('published_at') or ''
-                in_mp = item.get('in_model_portfolio', False)
-
-                if sym and price_target is not None:
-                    try:
-                        target_val = float(price_target)
-                        if target_val > 0 and sym not in targets:
-                            dt_str = pub_date.split('T')[0] if 'T' in pub_date else str(pub_date)
-                            rec_str = rec_type
-                            targets[sym] = {
-                                "broker": "HSBC Yatırım",
-                                "target_price": round(target_val, 2),
-                                "recommendation": rec_str,
-                                "date": dt_str if dt_str else "Güncel"
-                            }
-                    except (ValueError, TypeError):
-                        pass
-    except Exception as e:
-        print(f"HSBC Yatirim scrape error: {e}")
-
-    if targets:
-        _hsbc_cache['timestamp'] = now
-        _hsbc_cache['data'] = targets
-
-    return _hsbc_cache['data']
-
-
-
-
-
-
-@router.get("/news/{symbol}")
-def get_news(symbol: str):
-    """
-    Fetch recent news for a symbol using yfinance.
-    """
-    try:
-        yf_symbol = symbol if symbol.endswith(".IS") else f"{symbol}.IS"
-        ticker = yf.Ticker(yf_symbol)
-        news_data = ticker.news
-        
-        formatted_news = []
-        for item in news_data:
-            content = item.get("content", {})
-            title = content.get("title", "No Title")
-            source = content.get("provider", {}).get("displayName", "Yahoo Finance")
-            url = content.get("clickThroughUrl", {}).get("url", "#")
+            targets = [float(x['price_target']) for x in results if x.get('price_target') is not None]
+            in_mp = sum(1 for x in results if x.get('in_model_portfolio'))
             
-            pub_date = content.get("pubDate") or content.get("displayTime") or item.get("providerPublishTime")
-            date_str = ""
-            if pub_date:
-                if isinstance(pub_date, (int, float)):
-                    dt = datetime.datetime.fromtimestamp(pub_date, datetime.timezone.utc)
-                    date_str = dt.strftime("%d.%m.%Y %H:%M")
-                elif isinstance(pub_date, str):
+            if targets:
+                avg_target = round(sum(targets) / len(targets), 2)
+                min_target = round(min(targets), 2)
+                max_target = round(max(targets), 2)
+                
+                current_price = None
+                try:
+                    t = yf.Ticker(f"{clean_sym}.IS")
+                    fast = t.fast_info
+                    current_price = getattr(fast, 'last_price', None) or getattr(fast, 'previous_close', None)
+                except Exception:
+                    pass
+                    
+                pot_return = None
+                if current_price and current_price > 0:
+                    pot_return = round(((avg_target / current_price) - 1) * 100, 2)
+                    
+                summary = {
+                    "avg_target_price": avg_target,
+                    "potential_return": pot_return,
+                    "target_price_min": min_target,
+                    "target_price_max": max_target,
+                    "total_recommendations": len(results),
+                    "model_portfolio_count": in_mp
+                }
+    except Exception as e:
+        print(f"Fintables analyst ratings error for {clean_sym}: {e}")
+        
+    _fintables_cache[clean_sym] = {'timestamp': now, 'data': summary}
+    return summary
+
+
+
+
+
+
+_news_cache = {}
+
+def fetch_fintables_news(symbol: str):
+    now = time.time()
+    clean_sym = symbol.replace(".IS", "").upper()
+    
+    if clean_sym in _news_cache:
+        cached = _news_cache[clean_sym]
+        if now - cached['timestamp'] < 900:
+            return cached['data']
+            
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Referer': 'https://fintables.com/'
+    }
+    
+    formatted_news = []
+    try:
+        url = f"https://api.fintables.com/topic-feed/?symbols={clean_sym}&page_size=40"
+        res = requests.get(url, headers=headers, timeout=6)
+        if res.status_code == 200:
+            data = res.json()
+            raw_results = data.get("results", [])
+            
+            for item in raw_results:
+                item_type = item.get("type")
+                importance = item.get("importance")
+                highlight = item.get("highlight")
+                pinned = item.get("pinned")
+                
+                # Filter for "Öne Çıkanlar" (Featured) news items
+                is_featured = (
+                    highlight is True or 
+                    pinned is True or 
+                    importance in ['high', 'mid'] or 
+                    item_type in ['post', 'article']
+                )
+                
+                if not is_featured:
+                    continue
+                    
+                title = ""
+                summary = ""
+                pub_date = item.get("date") or ""
+                date_str = ""
+                if pub_date:
                     try:
                         dt = datetime.datetime.fromisoformat(pub_date.replace("Z", "+00:00"))
                         date_str = dt.strftime("%d.%m.%Y %H:%M")
                     except Exception:
-                        date_str = pub_date
-
-            if title != "No Title":
-                formatted_news.append({
-                    "title": title,
-                    "source": source,
-                    "url": url,
-                    "date": date_str
-                })
-        
-        # Fallback if no news
-        if not formatted_news:
-            clean_symbol = symbol.replace(".IS", "")
-            formatted_news = [
-                {"title": f"{clean_symbol} hakkında güncel haber bulunamadı.", "source": "Sistem", "url": "#", "date": "-"}
-            ]
-            
-        return {
-            "symbol": symbol,
-            "news": formatted_news
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-def is_within_last_days(date_str: str, days: int = 7) -> bool:
-    if not date_str or date_str == '-':
-        return False
-    try:
-        parts = date_str.strip().split(' ')
-        d_parts = parts[0].split('.')
-        if len(d_parts) == 3:
-            day = int(d_parts[0])
-            month = int(d_parts[1])
-            year = int(d_parts[2])
-            pub_date = datetime.date(year, month, day)
-            today = datetime.date.today()
-            return (today - pub_date).days <= days
-    except Exception:
-        pass
-    return False
-
-@router.get("/kap/{symbol}")
-def get_kap_reports(symbol: str):
-    """
-    Fetch and filter recent KAP disclosures for the symbol into 5 key categories:
-    Özel Durum Açıklaması, Finansal Rapor, Sermaye Artırımı, Pay Geri Alım, Temettü.
-    """
-    try:
-        clean_symbol = symbol.replace(".IS", "").upper()
-        reports = []
-        
-        try:
-            comp = pykap.bist.BISTCompany(ticker=clean_symbol)
-            c_id = comp.company_id
-            
-            today = datetime.date.today()
-            from_date = today - datetime.timedelta(days=180)
-            
-            payload = {
-                'fromDate': str(from_date),
-                'toDate': str(today),
-                'mkkMemberOidList': [c_id],
-                'inactiveMkkMemberOidList': [],
-                'bdkMemberOidList': [],
-                'fromSrc': False,
-                'disclosureIndexList': []
-            }
-            
-            res = requests.post('https://www.kap.org.tr/tr/api/disclosure/members/byCriteria', json=payload, timeout=8)
-            if res.status_code == 200:
-                items = res.json()
-                
-                def classify_item(item):
-                    d_class = item.get('disclosureClass', '')
-                    d_type = item.get('disclosureType', '')
-                    text = f"{item.get('title') or ''} {item.get('summary') or ''}".lower()
-                    
-                    if any(k in text for k in ['sermaye art', 'bedelsiz', 'bedelli', 'sermaye azalt', 'hak kullanım']):
-                        return 'Sermaye Artırımı'
-                    if any(k in text for k in ['geri alım', 'geri alim', 'payların geri', 'pay geri']):
-                        return 'Pay Geri Alım'
-                    if any(k in text for k in ['kâr dağıtım', 'kar dagit', 'temettü', 'temettu']):
-                        return 'Temettü / Kâr Dağıtımı'
-                    if d_class == 'FR':
-                        return 'Finansal Rapor'
-                    if d_class == 'ODA' or d_type == 'ODA':
-                        return 'Özel Durum Açıklaması'
-                    return None  # Filter out noise (devre kesici, tescil vb.)
-
-                for item in items:
-                    category = classify_item(item)
-                    if category:
-                        disc_idx = item.get('disclosureIndex', '')
-                        link = f"https://www.kap.org.tr/tr/Bildirim/{disc_idx}" if disc_idx else "https://www.kap.org.tr/tr/"
-                        title = item.get('title') or item.get('summary') or 'KAP Bildirimi'
-                        date = item.get('publishDate', '')
-                        is_recent = is_within_last_days(date, 7)
+                        date_str = pub_date[:10] if len(pub_date) >= 10 else pub_date
                         
-                        reports.append({
-                            "category": category,
-                            "title": title,
-                            "summary": item.get('summary', ''),
-                            "date": date,
-                            "link": link,
-                            "is_recent": is_recent
-                        })
-                        if len(reports) >= 40:  # Return top 40 filtered disclosures
-                            break
-
-        except Exception as e:
-            print(f"KAP fetch error for {clean_symbol}: {e}")
-
-        # Fallback to pykap basic disclosures if byCriteria returned nothing
-        if not reports:
-            try:
-                comp = pykap.bist.BISTCompany(ticker=clean_symbol)
-                disclosures = comp.get_disclosures()
-                for item in disclosures[:10]:
-                    title = item.get('title', item.get('summary', 'KAP Bildirimi'))
-                    date = item.get('publishDate', '')
-                    index = item.get('disclosureIndex', '')
-                    link = f"https://www.kap.org.tr/tr/Bildirim/{index}" if index else "https://www.kap.org.tr/tr/"
-                    is_recent = is_within_last_days(date, 7)
-                    reports.append({
-                        "category": "Finansal Rapor",
+                link = f"https://fintables.com/sirketler/{clean_sym}/akis"
+                source = "Fintables Haber"
+                
+                if item_type == "post":
+                    title = item.get("title", "Haber")
+                    p = item.get("post") or {}
+                    summary = p.get("body") or p.get("excerpt") or ""
+                    source = "Fintables Haber"
+                elif item_type == "article":
+                    art = item.get("article") or {}
+                    title = art.get("title") or item.get("title") or "Araştırma Notu"
+                    summary = art.get("description") or art.get("excerpt") or ""
+                    slug = art.get("slug")
+                    if slug:
+                        link = f"https://fintables.com/analiz/{slug}"
+                    source = "Fintables Araştırma"
+                elif item_type == "news":
+                    n = item.get("news") or {}
+                    title = item.get("subtitle") or n.get("summary") or n.get("subject") or item.get("title") or "KAP Bildirimi"
+                    summary = n.get("note") or n.get("summary") or n.get("subject") or ""
+                    kap_id = n.get("kap_id")
+                    if kap_id:
+                        link = f"https://www.kap.org.tr/tr/Bildirim/{kap_id}"
+                    source = "KAP Bildirimi"
+                else:
+                    title = item.get("title", "")
+                    
+                if title:
+                    formatted_news.append({
                         "title": title,
-                        "date": date,
-                        "link": link,
-                        "is_recent": is_recent
+                        "summary": summary,
+                        "source": source,
+                        "url": link,
+                        "date": date_str
                     })
-            except Exception as e:
-                print(f"Pykap fallback error for {clean_symbol}: {e}")
+    except Exception as e:
+        print(f"Fintables news fetch error for {clean_sym}: {e}")
+        
+    if not formatted_news:
+        formatted_news = [
+            {
+                "title": f"{clean_sym} için öne çıkan güncel haber bulunamadı.",
+                "summary": "",
+                "source": "Sistem",
+                "url": f"https://fintables.com/sirketler/{clean_sym}/akis",
+                "date": "-"
+            }
+        ]
+        
+    _news_cache[clean_sym] = {'timestamp': now, 'data': formatted_news}
+    return formatted_news
 
-        if not reports:
-            reports = [
-                {"category": "Bilgi", "title": f"{clean_symbol} için filtrelenmiş KAP bildirimi bulunamadı.", "date": "-", "link": "https://www.kap.org.tr/tr/", "is_recent": True}
-            ]
-
+@router.get("/news/{symbol}")
+def get_news(symbol: str):
+    """
+    Fetch featured news and disclosures for a symbol from Fintables feed.
+    """
+    try:
+        news_data = fetch_fintables_news(symbol)
         return {
             "symbol": symbol,
-            "reports": reports
+            "news": news_data
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -537,100 +196,14 @@ def get_kap_reports(symbol: str):
 @router.get("/broker-targets/{symbol}")
 def get_broker_targets(symbol: str):
     """
-    Scrape broker target prices from Is Yatirim, Ak Yatirim, Ziraat Yatirim, and Yahoo Finance.
+    Fetch Fintables analyst recommendations summary and consensus target price.
     """
     try:
         clean_symbol = symbol.replace(".IS", "").upper()
+        fintables_summary = fetch_fintables_summary(clean_symbol)
         targets = []
         
-        # 1. Scrape Is Yatirim from Sirket Karti
-        try:
-            h = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-            r = requests.get(f'https://www.isyatirim.com.tr/tr-tr/analiz/hisse/Sayfalar/sirket-karti.aspx?hisse={clean_symbol}', headers=h, timeout=8)
-            if r.status_code == 200:
-                r.encoding = 'utf-8'
-                soup = BeautifulSoup(r.text, 'html.parser')
-                
-                hedef_fiyat = 0.0
-                oneri = "-"
-                tarih = "-"
-                
-                oneri_span = soup.find('span', id='Oneri_Aciklama')
-                if oneri_span:
-                    oneri = oneri_span.text.strip().capitalize()
-                    
-                for li in soup.find_all('li'):
-                    text = li.text.strip()
-                    span = li.find('span')
-                    if span:
-                        val = span.text.strip()
-                        if text.startswith('Hedef Fiyat'):
-                            try:
-                                hedef_fiyat = float(val.replace(',', '.'))
-                            except ValueError:
-                                hedef_fiyat = 0.0
-                        elif text.startswith('Son ') and 'Tarih' in text:
-                            tarih = val
-                            
-                if hedef_fiyat > 0.0:
-                    targets.append({
-                        "broker": "İş Yatırım", 
-                        "target_price": hedef_fiyat, 
-                        "recommendation": oneri, 
-                        "date": tarih
-                    })
-        except Exception as e:
-            print(f"Is Yatirim scrape error: {e}")
-
-        # 2. Scrape Ak Yatırım Model Portföy
-        try:
-            ak_targets = fetch_ak_targets()
-            if clean_symbol in ak_targets:
-                targets.append(ak_targets[clean_symbol])
-        except Exception as e:
-            print(f"Ak Yatirim target error: {e}")
-
-        # 3. Scrape Yapı Kredi Yatırım Model Portföy
-        try:
-            yky_targets = fetch_yky_targets()
-            if clean_symbol in yky_targets:
-                targets.append(yky_targets[clean_symbol])
-        except Exception as e:
-            print(f"Yapi Kredi Yatirim target error: {e}")
-
-        # 4. Scrape Ziraat Yatırım (Haftalık Teknik / Öneri Portföyü)
-        try:
-            ziraat_targets = fetch_ziraat_targets()
-            if clean_symbol in ziraat_targets:
-                targets.append(ziraat_targets[clean_symbol])
-        except Exception as e:
-            print(f"Ziraat Yatirim target error: {e}")
-
-        # 5. Scrape Deniz Yatırım Model Portföy
-        try:
-            deniz_targets = fetch_deniz_targets()
-            if clean_symbol in deniz_targets:
-                targets.append(deniz_targets[clean_symbol])
-        except Exception as e:
-            print(f"Deniz Yatirim target error: {e}")
-
-        # 6. Scrape Tera Yatırım Model Portföy
-        try:
-            tera_targets = fetch_tera_targets()
-            if clean_symbol in tera_targets:
-                targets.append(tera_targets[clean_symbol])
-        except Exception as e:
-            print(f"Tera Yatirim target error: {e}")
-
-        # 7. Scrape HSBC Yatırım (via Fintables API)
-        try:
-            hsbc_targets = fetch_hsbc_targets()
-            if clean_symbol in hsbc_targets:
-                targets.append(hsbc_targets[clean_symbol])
-        except Exception as e:
-            print(f"HSBC Yatirim target error: {e}")
-
-        # 8. Get Yahoo Finance Consensus
+        # Keep consensus target (from Yahoo Finance or Fintables average)
         try:
             yf_symbol = f"{clean_symbol}.IS"
             ticker = yf.Ticker(yf_symbol)
@@ -650,21 +223,32 @@ def get_broker_targets(symbol: str):
                 else:
                     recom_text = "Tut"
             
-            if mean_target:
+            target_price_val = round(mean_target, 2) if mean_target else (fintables_summary.get("avg_target_price") if fintables_summary else None)
+            
+            if target_price_val:
                 targets.append({
                     "broker": "Konsensüs (Ortalama)",
-                    "target_price": round(mean_target, 2),
+                    "target_price": target_price_val,
                     "recommendation": recom_text,
                     "date": "Güncel"
                 })
-                
         except Exception as e:
-            print(f"YFinance target error: {e}")
+            print(f"Consensus target error: {e}")
+            if fintables_summary and fintables_summary.get("avg_target_price"):
+                targets.append({
+                    "broker": "Konsensüs (Ortalama)",
+                    "target_price": fintables_summary["avg_target_price"],
+                    "recommendation": "Al",
+                    "date": "Güncel"
+                })
             
         return {
             "symbol": symbol,
+            "summary": fintables_summary,
             "targets": targets
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

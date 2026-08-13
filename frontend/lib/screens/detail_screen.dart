@@ -18,9 +18,7 @@ class _DetailScreenState extends State<DetailScreen> {
   Map<String, dynamic>? _quote;
   Map<String, dynamic>? _signals;
   Map<String, dynamic>? _news;
-  Map<String, dynamic>? _kapReports;
   Map<String, dynamic>? _brokerTargets;
-  int _kapVisibleWeeks = 1;
   int _newsVisibleWeeks = 1;
   
   List<ChartData>? _chartData;
@@ -64,7 +62,6 @@ class _DetailScreenState extends State<DetailScreen> {
     final results = await Future.wait([
       ApiService.getSignals(widget.symbol),
       ApiService.getNews(widget.symbol),
-      ApiService.getKapReports(widget.symbol),
       ApiService.getBrokerTargets(widget.symbol),
       ApiService.getChartData(widget.symbol, interval: _selectedInterval),
       ApiService.getQuote(widget.symbol),
@@ -74,14 +71,12 @@ class _DetailScreenState extends State<DetailScreen> {
       setState(() {
         _signals = results[0];
         _news = results[1];
-        _kapReports = results[2];
-        _brokerTargets = results[3];
-        _kapVisibleWeeks = 1;
+        _brokerTargets = results[2];
         _newsVisibleWeeks = 1;
-        if (results[5] != null) {
-          _quote = results[5];
+        if (results[4] != null) {
+          _quote = results[4];
         }
-        _chartData = _parseChartData(results[4]);
+        _chartData = _parseChartData(results[3]);
         _isLoading = false;
       });
     }
@@ -216,10 +211,7 @@ class _DetailScreenState extends State<DetailScreen> {
                   _buildSectionTitle('Banka / Aracı Kurum Hedefleri'),
                   _buildBrokerTargetsSection(),
                   const SizedBox(height: 24),
-                  _buildSectionTitle('KAP Raporları'),
-                  _buildKapReportsSection(),
-                  const SizedBox(height: 24),
-                  _buildSectionTitle('Haberler'),
+                  _buildSectionTitle('Haberler & Gelişmeler (Fintables Öne Çıkanlar)'),
                   _buildNewsSection(),
                 ],
               ),
@@ -294,82 +286,174 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Widget _buildBrokerTargetsSection() {
-    if (_brokerTargets == null || _brokerTargets!['targets'] == null) {
-      return const Text('Hedef fiyat bulunamadı.', style: TextStyle(color: Colors.white54));
-    }
-    
-    final targets = _brokerTargets!['targets'] as List;
-    if (targets.isEmpty) {
-      return const Text('Hedef fiyat bulunamadı.', style: TextStyle(color: Colors.white54));
+    final summary = _brokerTargets != null ? _brokerTargets!['summary'] as Map<String, dynamic>? : null;
+    final targets = _brokerTargets != null ? _brokerTargets!['targets'] as List? : null;
+
+    if (summary == null && (targets == null || targets.isEmpty)) {
+      return const Text('Hedef fiyat veya analist tavsiyesi bulunamadı.', style: TextStyle(color: Colors.white54));
     }
 
-    double total = 0;
-    int count = 0;
-    for (var t in targets) {
-      final price = (t['target_price'] ?? 0).toDouble();
-      if (price > 0) {
-        total += price;
-        count++;
-      }
-    }
-    
-    double average = count > 0 ? total / count : 0.0;
-    
     List<Widget> children = [];
-    if (count > 0) {
+
+    if (summary != null) {
+      final num? avgTarget = summary['avg_target_price'];
+      final num? potReturn = summary['potential_return'];
+      final num? minTarget = summary['target_price_min'];
+      final num? maxTarget = summary['target_price_max'];
+      final int totalRecs = (summary['total_recommendations'] ?? 0) as int;
+      final int mpCount = (summary['model_portfolio_count'] ?? 0) as int;
+
+      String avgStr = avgTarget != null ? '₺${_formatNum(avgTarget)}' : '-';
+      String potStr = potReturn != null ? '%${_formatNum(potReturn)}' : '-';
+      String rangeStr = (minTarget != null && maxTarget != null) 
+          ? '₺${_formatNum(minTarget)} - ₺${_formatNum(maxTarget)}' 
+          : '-';
+      String countStr = '$totalRecs ($mpCount Model Portföyde Bulunuyor)';
+
+      Color potColor = (potReturn != null && potReturn >= 0) ? Colors.greenAccent : Colors.redAccent;
+
       children.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF151518),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white10),
+          ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Ortalama Beklenti: ₺${average.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  color: Colors.greenAccent,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              Row(
+                children: const [
+                  Icon(Icons.analytics_outlined, color: Colors.blueAccent, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Fintables Analist Tavsiyeleri Özeti',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              _buildSummaryRow(
+                label: 'Ortalama Hedef Fiyat',
+                valueWidget: Wrap(
+                  cross: WrapCrossAlignment.center,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    Text(
+                      avgStr,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (potReturn != null) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '(Potansiyel Getiri: $potStr)',
+                        style: TextStyle(
+                          color: potColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              const Divider(color: Colors.white24, thickness: 1),
-              const SizedBox(height: 8),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0),
+                child: Divider(color: Colors.white12, height: 1),
+              ),
+              _buildSummaryRow(
+                label: 'Hedef Fiyat Aralığı',
+                valueText: rangeStr,
+                valueColor: Colors.white,
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0),
+                child: Divider(color: Colors.white12, height: 1),
+              ),
+              _buildSummaryRow(
+                label: 'Tavsiye Sayısı',
+                valueText: countStr,
+                valueColor: Colors.white70,
+              ),
             ],
           ),
         ),
       );
     }
 
-    children.addAll(targets.map((t) {
-      String rawRec = (t['recommendation'] ?? '').toString();
-      String recText = rawRec;
-      final mpMatch = RegExp(r'Model\s+Portfö?y\s*\((.*?)\)', caseSensitive: false).firstMatch(recText);
-      if (mpMatch != null) {
-        recText = mpMatch.group(1) ?? recText;
-      }
-      recText = recText.replaceAll(RegExp(r'Model\s+Portfö?y', caseSensitive: false), '').trim();
-      if (recText.isEmpty) recText = 'Al';
-
-      return Card(
-        color: const Color(0xFF151518),
-        margin: const EdgeInsets.only(bottom: 8),
-        child: ListTile(
-          title: Text(t['broker'], style: const TextStyle(color: Colors.white)),
-          subtitle: Text(t['date'], style: const TextStyle(color: Colors.white54)),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text('₺${t['target_price']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              Text(recText, style: const TextStyle(color: Colors.blueAccent)),
-            ],
+    if (targets != null && targets.isNotEmpty) {
+      children.addAll(targets.map((t) {
+        String rawRec = (t['recommendation'] ?? '').toString();
+        return Card(
+          color: const Color(0xFF151518),
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            title: Text(t['broker'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+            subtitle: Text(t['date'] ?? '', style: const TextStyle(color: Colors.white54)),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('₺${_formatNum(t['target_price'])}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(rawRec, style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.w500)),
+              ],
+            ),
           ),
-        ),
-      );
-    }).toList());
+        );
+      }).toList());
+    }
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: children,
     );
+  }
+
+  Widget _buildSummaryRow({
+    required String label,
+    String? valueText,
+    Widget? valueWidget,
+    Color valueColor = Colors.white,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white54, fontSize: 14),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: valueWidget ??
+                Text(
+                  valueText ?? '-',
+                  style: TextStyle(color: valueColor, fontSize: 14, fontWeight: FontWeight.w600),
+                  textAlign: TextAlign.end,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatNum(dynamic val, {int decimals = 2}) {
+    if (val == null) return '-';
+    if (val is num) {
+      return val.toStringAsFixed(decimals).replaceAll('.', ',');
+    }
+    return val.toString();
   }
 
   int? _getDaysAgo(String? dateStr) {
@@ -402,182 +486,14 @@ class _DetailScreenState extends State<DetailScreen> {
     return null;
   }
 
-  Widget _buildKapReportsSection() {
-    if (_kapReports == null || _kapReports!['reports'] == null) {
-      return const Text('KAP verisi bulunamadı.', style: TextStyle(color: Colors.white54));
-    }
-    
-    final reports = _kapReports!['reports'] as List;
-    if (reports.isEmpty) {
-      return const Text('KAP verisi bulunamadı.', style: TextStyle(color: Colors.white54));
-    }
-
-    final bool isInfoOnly = reports.length == 1 && reports[0]['category'] == 'Bilgi';
-
-    final displayedReports = reports.where((r) {
-      if (isInfoOnly) return true;
-      final daysAgo = _getDaysAgo(r['date']?.toString());
-      if (daysAgo != null) {
-        return daysAgo <= (_kapVisibleWeeks * 7);
-      }
-      return true;
-    }).toList();
-
-    final bool hasMore = !isInfoOnly && displayedReports.length < reports.length;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (displayedReports.isEmpty && !isInfoOnly)
-          Container(
-            padding: const EdgeInsets.all(14),
-            margin: const EdgeInsets.only(bottom: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E24),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white12),
-            ),
-            child: Text(
-              'Son $_kapVisibleWeeks hafta (${_kapVisibleWeeks * 7} gün) içerisinde KAP bildirimi bulunmamaktadır.',
-              style: const TextStyle(color: Colors.white54, fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ...displayedReports.map((r) {
-          final category = r['category'] ?? 'KAP Bildirimi';
-          return Card(
-            color: const Color(0xFF151518),
-            margin: const EdgeInsets.only(bottom: 10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: const BorderSide(color: Colors.white12, width: 1),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF24242A),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: Colors.white24, width: 1),
-                                  ),
-                                  child: Text(
-                                    category,
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                Text(
-                                  r['date'] ?? '',
-                                  style: const TextStyle(color: Colors.white38, fontSize: 11),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              r['title'] ?? '',
-                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      InkWell(
-                        onTap: () async {
-                          final url = Uri.parse(r['link'] ?? r['url'] ?? '');
-                          if (await canLaunchUrl(url)) {
-                            await launchUrl(url);
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF222228),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.white12, width: 1),
-                          ),
-                          child: const Icon(Icons.open_in_new, color: Colors.white70, size: 18),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-        if (hasMore) ...[
-          const SizedBox(height: 4),
-          Center(
-            child: InkWell(
-              onTap: () {
-                setState(() {
-                  _kapVisibleWeeks++;
-                });
-              },
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF222228),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Colors.white24,
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Text(
-                      'Daha Fazla Göster (+1 Hafta)',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                    SizedBox(width: 6),
-                    Icon(
-                      Icons.expand_more,
-                      color: Colors.white70,
-                      size: 18,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-  
   Widget _buildNewsSection() {
     if (_news == null || _news!['news'] == null) {
-      return const Text('Haber bulunamadı.', style: TextStyle(color: Colors.white54));
+      return const Text('Haber veya gelişme bulunamadı.', style: TextStyle(color: Colors.white54));
     }
     
     final newsList = _news!['news'] as List;
     if (newsList.isEmpty) {
-      return const Text('Haber bulunamadı.', style: TextStyle(color: Colors.white54));
+      return const Text('Haber veya gelişme bulunamadı.', style: TextStyle(color: Colors.white54));
     }
 
     final bool isInfoOnly = newsList.length == 1 && (newsList[0]['source'] == 'Sistem' || newsList[0]['title'].toString().contains('bulunamadı'));
@@ -606,35 +522,112 @@ class _DetailScreenState extends State<DetailScreen> {
               border: Border.all(color: Colors.white12),
             ),
             child: Text(
-              'Son $_newsVisibleWeeks hafta (${_newsVisibleWeeks * 7} gün) içerisinde haber bulunmamaktadır.',
+              'Son $_newsVisibleWeeks hafta (${_newsVisibleWeeks * 7} gün) içerisinde öne çıkan haber bulunmamaktadır.',
               style: const TextStyle(color: Colors.white54, fontSize: 13),
               textAlign: TextAlign.center,
             ),
           ),
         ...displayedNews.map((n) {
+          final String title = (n['title'] ?? '').toString();
+          final String summary = (n['summary'] ?? '').toString();
           final String dateStr = n['date'] != null && n['date'].toString() != '-' ? n['date'].toString() : '';
-          final String subtitleText = dateStr.isNotEmpty ? '${n['source']} • $dateStr' : (n['source'] ?? '');
+          final String sourceStr = (n['source'] ?? 'Fintables').toString();
+
+          Color tagBg = const Color(0xFF24242A);
+          Color tagText = Colors.white70;
+          if (sourceStr.contains('KAP')) {
+            tagBg = const Color(0xFF1E3A29);
+            tagText = Colors.greenAccent;
+          } else if (sourceStr.contains('Araştırma')) {
+            tagBg = const Color(0xFF3B2D14);
+            tagText = Colors.amberAccent;
+          }
 
           return Card(
             color: const Color(0xFF151518),
-            margin: const EdgeInsets.only(bottom: 8),
+            margin: const EdgeInsets.only(bottom: 10),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
               side: const BorderSide(color: Colors.white12, width: 1),
             ),
-            child: ListTile(
-              title: Text(n['title'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 14)),
-              subtitle: subtitleText.isNotEmpty ? Text(subtitleText, style: const TextStyle(color: Colors.white54, fontSize: 12)) : null,
-              trailing: const Icon(Icons.open_in_new, color: Colors.white70, size: 18),
-              onTap: () async {
-                final urlStr = n['url'] ?? n['link'] ?? '';
-                if (urlStr.isNotEmpty && urlStr != '#') {
-                  final url = Uri.parse(urlStr);
-                  if (await canLaunchUrl(url)) {
-                    await launchUrl(url);
-                  }
-                }
-              },
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: tagBg,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.white12, width: 1),
+                        ),
+                        child: Text(
+                          sourceStr,
+                          style: TextStyle(
+                            color: tagText,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (dateStr.isNotEmpty)
+                        Text(
+                          dateStr,
+                          style: const TextStyle(color: Colors.white38, fontSize: 11),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    title,
+                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  if (summary.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      summary,
+                      style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.3),
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: InkWell(
+                      onTap: () async {
+                        final urlStr = n['url'] ?? n['link'] ?? '';
+                        if (urlStr.isNotEmpty && urlStr != '#') {
+                          final url = Uri.parse(urlStr);
+                          if (await canLaunchUrl(url)) {
+                            await launchUrl(url);
+                          }
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF222228),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.white12, width: 1),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Text('Detay ', style: TextStyle(color: Colors.blueAccent, fontSize: 12, fontWeight: FontWeight.w500)),
+                            Icon(Icons.open_in_new, color: Colors.blueAccent, size: 14),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }),
