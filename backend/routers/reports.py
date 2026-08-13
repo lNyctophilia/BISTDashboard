@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 import yfinance as yf
 import requests
+import cloudscraper
 from bs4 import BeautifulSoup
 import pykap
 import time
@@ -34,8 +35,9 @@ def fetch_fintables_summary(symbol: str):
     summary = None
     targets_list = []
     try:
+        scraper = cloudscraper.create_scraper()
         url = f"https://api.fintables.com/analyst-ratings/?code={clean_sym}"
-        res = requests.get(url, headers=headers, timeout=10)
+        res = scraper.get(url, headers=headers, timeout=15)
         if res.status_code == 200:
             data = res.json()
             results = data.get('results', [])
@@ -126,8 +128,9 @@ def fetch_fintables_news(symbol: str):
     
     formatted_news = []
     try:
+        scraper = cloudscraper.create_scraper()
         url = f"https://api.fintables.com/topic-feed/?symbols={clean_sym}&page_size=40"
-        res = requests.get(url, headers=headers, timeout=10)
+        res = scraper.get(url, headers=headers, timeout=15)
         if res.status_code == 200:
             data = res.json()
             raw_results = data.get("results", [])
@@ -250,8 +253,9 @@ def debug_fintables(symbol: str):
         'Origin': 'https://fintables.com'
     }
     
-    r1 = requests.get(f"https://api.fintables.com/analyst-ratings/?code={clean_sym}", headers=headers, timeout=8)
-    r2 = requests.get(f"https://api.fintables.com/topic-feed/?symbols={clean_sym}&page_size=40", headers=headers, timeout=8)
+    scraper = cloudscraper.create_scraper()
+    r1 = scraper.get(f"https://api.fintables.com/analyst-ratings/?code={clean_sym}", headers=headers, timeout=8)
+    r2 = scraper.get(f"https://api.fintables.com/topic-feed/?symbols={clean_sym}&page_size=40", headers=headers, timeout=8)
     
     return {
         "symbol": clean_sym,
