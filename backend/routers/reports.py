@@ -250,7 +250,15 @@ def get_broker_targets(symbol: str):
                     "recommendation": "Al",
                     "date": "Güncel"
                 })
-            
+                
+        return {
+            "symbol": symbol,
+            "summary": fintables_summary,
+            "targets": targets
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/debug-fintables/{symbol}")
 def debug_fintables(symbol: str):
     clean_sym = symbol.replace(".IS", "").upper()
