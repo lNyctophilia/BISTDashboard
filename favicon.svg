@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Düz Renk Tam Arkaplan (Köşelerde yumuşatma/maske yok) -->
+  <rect width="512" height="512" fill="#07090E"/>
+
+  <!-- Klasik Kırmızı Mum (Düşüş/Dip) -->
+  <line x1="168" y1="240" x2="168" y2="410" stroke="#EF4444" stroke-width="10" stroke-linecap="round"/>
+  <rect x="136" y="270" width="64" height="110" rx="10" fill="#EF4444"/>
+
+  <!-- Klasik Yeşil Mum (Yükseliş) -->
+  <line x1="256" y1="160" x2="256" y2="360" stroke="#22C55E" stroke-width="10" stroke-linecap="round"/>
+  <rect x="224" y="190" width="64" height="130" rx="10" fill="#22C55E"/>
+
+  <!-- Klasik Yeşil Mum (Güçlü Yükseliş) -->
+  <line x1="344" y1="100" x2="344" y2="310" stroke="#22C55E" stroke-width="10" stroke-linecap="round"/>
+  <rect x="312" y="130" width="64" height="130" rx="10" fill="#22C55E"/>
+</svg>

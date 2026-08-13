@@ -1,0 +1,19 @@
+{
+    "name": "BIST Dashboard",
+    "short_name": "BIST Dashboard",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#07090e",
+    "theme_color": "#07090e",
+    "description": "BIST Dashboard - Borsa İstanbul Analiz Terminali",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ]
+}
