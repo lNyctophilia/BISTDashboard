@@ -249,11 +249,26 @@ def get_broker_targets(symbol: str):
                     "date": "Güncel"
                 })
             
-        return {
-            "symbol": symbol,
-            "summary": fintables_summary,
-            "targets": targets
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@router.get("/debug-fintables/{symbol}")
+def debug_fintables(symbol: str):
+    clean_sym = symbol.replace(".IS", "").upper()
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Referer': f'https://fintables.com/sirketler/{clean_sym}/analist-tavsiyeleri',
+        'Origin': 'https://fintables.com'
+    }
+    
+    r1 = requests.get(f"https://api.fintables.com/analyst-ratings/?code={clean_sym}", headers=headers, timeout=8)
+    r2 = requests.get(f"https://api.fintables.com/topic-feed/?symbols={clean_sym}&page_size=40", headers=headers, timeout=8)
+    
+    return {
+        "symbol": clean_sym,
+        "analyst_ratings_status": r1.status_code,
+        "analyst_ratings_preview": r1.text[:300],
+        "topic_feed_status": r2.status_code,
+        "topic_feed_preview": r2.text[:300]
+    }
+
 
