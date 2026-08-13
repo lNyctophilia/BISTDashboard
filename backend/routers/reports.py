@@ -21,7 +21,7 @@ def fetch_fintables_summary(symbol: str):
     if clean_sym in _fintables_cache:
         cached = _fintables_cache[clean_sym]
         if now - cached['timestamp'] < 3600:
-            return cached['data']
+            return cached['summary'], cached['targets']
             
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
@@ -32,23 +32,49 @@ def fetch_fintables_summary(symbol: str):
     }
     
     summary = None
+    targets_list = []
     try:
         url = f"https://api.fintables.com/analyst-ratings/?code={clean_sym}"
         res = requests.get(url, headers=headers, timeout=10)
         if res.status_code == 200:
             data = res.json()
             results = data.get('results', [])
-            targets = [float(x['price_target']) for x in results if x.get('price_target') is not None]
+            valid_targets = [float(x['price_target']) for x in results if x.get('price_target') is not None]
             in_mp = sum(1 for x in results if x.get('in_model_portfolio'))
             
-            if targets:
-                avg_target = round(sum(targets) / len(targets), 2)
-                min_target = round(min(targets), 2)
-                max_target = round(max(targets), 2)
+            for item in results:
+                if item.get('price_target') is not None:
+                    broker = item.get('brokerage', {}).get('title') or item.get('brokerage', {}).get('short_title') or 'Aracı Kurum'
+                    target_p = round(float(item['price_target']), 2)
+                    raw_type = (item.get('type') or 'al').upper()
+                    rec_map = {
+                        'AL': 'Al', 'TUT': 'Tut', 'SAT': 'Sat',
+                        'ENDEKS_UZERINDE': 'Endeks Üzeri Getiri',
+                        'ENDEKS_USTU': 'Endeks Üzeri Getiri',
+                        'ENDEKS_ALTINDA': 'Endeks Altı Getiri',
+                        'ENDEKS_PARALEL': 'Endekse Paralel'
+                    }
+                    rec_text = rec_map.get(raw_type, raw_type.capitalize())
+                    pub_date = item.get('published_at', '')
+                    date_str = pub_date[:10] if pub_date else 'Güncel'
+                    if len(date_str) == 10 and '-' in date_str:
+                        p = date_str.split('-')
+                        date_str = f"{p[2]}.{p[1]}.{p[0]}"
+                    targets_list.append({
+                        "broker": broker,
+                        "target_price": target_p,
+                        "recommendation": rec_text,
+                        "date": date_str,
+                        "in_model_portfolio": item.get('in_model_portfolio', False)
+                    })
+            
+            if valid_targets:
+                avg_target = round(sum(valid_targets) / len(valid_targets), 2)
+                min_target = round(min(valid_targets), 2)
+                max_target = round(max(valid_targets), 2)
                 
                 current_price = None
                 try:
-                    time.sleep(random.uniform(0.3, 0.8))
                     t = yf.Ticker(f"{clean_sym}.IS")
                     fast = t.fast_info
                     current_price = getattr(fast, 'last_price', None) or getattr(fast, 'previous_close', None)
@@ -70,9 +96,9 @@ def fetch_fintables_summary(symbol: str):
     except Exception as e:
         print(f"Fintables analyst ratings error for {clean_sym}: {e}")
         
-    if summary is not None:
-        _fintables_cache[clean_sym] = {'timestamp': now, 'data': summary}
-    return summary
+    if summary is not None or targets_list:
+        _fintables_cache[clean_sym] = {'timestamp': now, 'summary': summary, 'targets': targets_list}
+    return summary, targets_list
 
 
 
@@ -108,21 +134,7 @@ def fetch_fintables_news(symbol: str):
             
             for item in raw_results:
                 item_type = item.get("type")
-                importance = item.get("importance")
-                highlight = item.get("highlight")
-                pinned = item.get("pinned")
                 
-                # Filter for "Öne Çıkanlar" (Featured) news items
-                is_featured = (
-                    highlight is True or 
-                    pinned is True or 
-                    importance in ['high', 'mid'] or 
-                    item_type in ['post', 'article', 'news']
-                )
-                
-                if not is_featured:
-                    continue
-                    
                 title = ""
                 summary = ""
                 pub_date = item.get("date") or ""
@@ -138,8 +150,8 @@ def fetch_fintables_news(symbol: str):
                 source = "Fintables Haber"
                 
                 if item_type == "post":
-                    title = item.get("title", "Haber")
                     p = item.get("post") or {}
+                    title = item.get("title") or p.get("title") or "Haber"
                     summary = p.get("body") or p.get("excerpt") or ""
                     source = "Fintables Haber"
                 elif item_type == "article":
@@ -150,25 +162,34 @@ def fetch_fintables_news(symbol: str):
                     if slug:
                         link = f"https://fintables.com/analiz/{slug}"
                     source = "Fintables Araştırma"
-                elif item_type == "news":
-                    n = item.get("news") or {}
+                elif item_type in ["news", "disclosure"]:
+                    n = item.get("news") or item.get("disclosure") or {}
                     title = item.get("subtitle") or n.get("summary") or n.get("subject") or item.get("title") or "KAP Bildirimi"
                     summary = n.get("note") or n.get("summary") or n.get("subject") or ""
-                    kap_id = n.get("kap_id")
+                    kap_id = n.get("kap_id") or n.get("id")
                     if kap_id:
                         link = f"https://www.kap.org.tr/tr/Bildirim/{kap_id}"
                     source = "KAP Bildirimi"
+                elif item_type == "newsletter":
+                    nl = item.get("newsletter") or {}
+                    title = item.get("title") or nl.get("title") or "Bülten"
+                    summary = nl.get("description") or nl.get("excerpt") or ""
+                    source = "Fintables Bülten"
                 else:
-                    title = item.get("title", "")
+                    title = item.get("title") or item.get("subtitle") or ""
+                    summary = item.get("summary") or ""
                     
                 if title:
-                    formatted_news.append({
-                        "title": title,
-                        "summary": summary,
-                        "source": source,
-                        "url": link,
-                        "date": date_str
-                    })
+                    title_clean = re.sub('<[^<]+?>', '', title).strip()
+                    summary_clean = re.sub('<[^<]+?>', '', summary).strip()
+                    if title_clean:
+                        formatted_news.append({
+                            "title": title_clean,
+                            "summary": summary_clean,
+                            "source": source,
+                            "url": link,
+                            "date": date_str
+                        })
     except Exception as e:
         print(f"Fintables news fetch error for {clean_sym}: {e}")
         
@@ -204,56 +225,15 @@ def get_news(symbol: str):
 @router.get("/broker-targets/{symbol}")
 def get_broker_targets(symbol: str):
     """
-    Fetch Fintables analyst recommendations summary and consensus target price.
+    Fetch Fintables analyst recommendations summary and detailed broker target prices.
     """
     try:
         clean_symbol = symbol.replace(".IS", "").upper()
-        fintables_summary = fetch_fintables_summary(clean_symbol)
-        targets = []
+        summary, targets = fetch_fintables_summary(clean_symbol)
         
-        # Keep consensus target (from Yahoo Finance or Fintables average)
-        try:
-            time.sleep(random.uniform(0.3, 0.8))
-            yf_symbol = f"{clean_symbol}.IS"
-            ticker = yf.Ticker(yf_symbol)
-            mean_target = ticker.info.get("targetMeanPrice")
-            
-            recom_text = "Al"
-            recoms = ticker.recommendations
-            if recoms is not None and not recoms.empty:
-                latest = recoms.iloc[0]
-                buy = latest.get("buy", 0) + latest.get("strongBuy", 0)
-                sell = latest.get("sell", 0) + latest.get("strongSell", 0)
-                hold = latest.get("hold", 0)
-                if buy > sell and buy > hold:
-                    recom_text = "Al"
-                elif sell > buy and sell > hold:
-                    recom_text = "Sat"
-                else:
-                    recom_text = "Tut"
-            
-            target_price_val = round(mean_target, 2) if mean_target else (fintables_summary.get("avg_target_price") if fintables_summary else None)
-            
-            if target_price_val:
-                targets.append({
-                    "broker": "Konsensüs (Ortalama)",
-                    "target_price": target_price_val,
-                    "recommendation": recom_text,
-                    "date": "Güncel"
-                })
-        except Exception as e:
-            print(f"Consensus target error: {e}")
-            if fintables_summary and fintables_summary.get("avg_target_price"):
-                targets.append({
-                    "broker": "Konsensüs (Ortalama)",
-                    "target_price": fintables_summary["avg_target_price"],
-                    "recommendation": "Al",
-                    "date": "Güncel"
-                })
-                
         return {
             "symbol": symbol,
-            "summary": fintables_summary,
+            "summary": summary,
             "targets": targets
         }
     except Exception as e:
