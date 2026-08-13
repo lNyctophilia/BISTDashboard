@@ -342,7 +342,7 @@ class _DetailScreenState extends State<DetailScreen> {
               _buildSummaryRow(
                 label: 'Ortalama Hedef Fiyat',
                 valueWidget: Wrap(
-                  cross: WrapCrossAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   alignment: WrapAlignment.end,
                   children: [
                     Text(

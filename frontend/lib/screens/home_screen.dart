@@ -39,7 +39,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (list.isEmpty) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _quotes.clear();
+          _isLoading = false;
+        });
+      }
       return;
     }
 
@@ -48,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (batchQuotes != null && batchQuotes.isNotEmpty) {
       if (mounted) {
         setState(() {
-          _quotes.addAll(batchQuotes);
+          _quotes = batchQuotes;
           _isLoading = false;
         });
       }
@@ -60,11 +65,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final results = await Future.wait(futures);
     if (mounted) {
       setState(() {
+        final Map<String, Map<String, dynamic>> newQuotes = {};
         for (int i = 0; i < list.length; i++) {
           if (results[i] != null) {
-            _quotes[list[i]] = results[i]!;
+            newQuotes[list[i]] = results[i]!;
           }
         }
+        _quotes = newQuotes;
         _isLoading = false;
       });
     }
@@ -113,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
     resetSearchInput();
     WidgetsBinding.instance.addPostFrameCallback((_) => resetSearchInput());
 
-    StorageService.addSymbol(upperSymbol);
+    await StorageService.saveWatchlist(_watchlist);
 
     if (mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -145,7 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _searchController.clear();
     }
 
-    StorageService.removeSymbol(symbol);
+    await StorageService.saveWatchlist(_watchlist);
 
     if (mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -471,6 +478,40 @@ class _HomeScreenState extends State<HomeScreen> {
                     leading: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
+                        color: Colors.blueAccent.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.refresh, color: Colors.blueAccent),
+                    ),
+                    title: const Text(
+                      'Varsayılan BİST 30\'u Yükle',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Takip listenizi varsayılan BİST 30 hisseleri ile yeniler.',
+                      style: TextStyle(color: Colors.white54, fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.chevron_right, color: Colors.blueAccent),
+                    onTap: () {
+                      Navigator.pop(bottomSheetContext);
+                      _resetToDefaultBist30(context);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Card(
+                  color: const Color(0xFF1E1E24),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: Colors.white10),
+                  ),
+                  child: ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
                         color: Colors.redAccent.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -497,7 +538,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 16),
                 const Center(
                   child: Text(
-                    'Versiyon (13.08.2026-07.50)',
+                    'Versiyon (13.08.2026-08.06)',
                     style: TextStyle(color: Colors.white38, fontSize: 12),
                   ),
                 ),
@@ -506,6 +547,27 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _resetToDefaultBist30(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await StorageService.resetToDefaultBist30();
+    if (!mounted) return;
+    await _loadWatchlist();
+    if (!mounted) return;
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.check_circle_outline, color: Colors.white),
+            SizedBox(width: 8),
+            Text('Varsayılan BİST 30 hisseleri yüklendi.'),
+          ],
+        ),
+        backgroundColor: Colors.blueAccent,
+        duration: Duration(seconds: 2),
+      ),
     );
   }
 
@@ -570,7 +632,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Icon(Icons.check_circle_outline, color: Colors.white),
               SizedBox(width: 8),
-              Text('Tüm önbellek ve veriler sıfırlandı, varsayılan BİST 30 yüklendi.'),
+              Text('Tüm veriler ve önbellek sıfırlandı. Takip listeniz temizlendi.'),
             ],
           ),
           backgroundColor: Colors.blueAccent,

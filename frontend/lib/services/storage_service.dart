@@ -16,7 +16,13 @@ class StorageService {
 
   static Future<void> clearAllData() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await prefs.setStringList(_watchlistKey, <String>[]);
+    final keys = prefs.getKeys();
+    for (String key in keys) {
+      if (key != _watchlistKey && key != 'bist_remember_auth' && key != 'bist_auth') {
+        await prefs.remove(key);
+      }
+    }
   }
 
   static Future<List<String>> getWatchlist() async {
@@ -24,27 +30,39 @@ class StorageService {
     final list = prefs.getStringList(_watchlistKey);
     
     if (list == null) {
-      // Return BIST 30 for the first time launch
-      await prefs.setStringList(_watchlistKey, BistStocks.bist30);
-      return BistStocks.bist30;
+      // First time launch: return BIST 30
+      final defaultList = List<String>.from(BistStocks.bist30);
+      await prefs.setStringList(_watchlistKey, defaultList);
+      return defaultList;
     }
     
-    return list;
+    return List<String>.from(list);
+  }
+
+  static Future<void> saveWatchlist(List<String> watchlist) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_watchlistKey, List<String>.from(watchlist));
+  }
+
+  static Future<void> resetToDefaultBist30() async {
+    final defaultList = List<String>.from(BistStocks.bist30);
+    await saveWatchlist(defaultList);
   }
 
   static Future<void> addSymbol(String symbol) async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList(_watchlistKey) ?? [];
+    final list = await getWatchlist();
     if (!list.contains(symbol)) {
       list.add(symbol);
-      await prefs.setStringList(_watchlistKey, list);
+      await saveWatchlist(list);
     }
   }
 
   static Future<void> removeSymbol(String symbol) async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList(_watchlistKey) ?? [];
-    list.remove(symbol);
-    await prefs.setStringList(_watchlistKey, list);
+    final list = await getWatchlist();
+    if (list.contains(symbol)) {
+      list.remove(symbol);
+      await saveWatchlist(list);
+    }
   }
 }
+

@@ -16,6 +16,7 @@ echo.
 
 echo 2. Flutter Web yerelde derleniyor...
 cd frontend
+if exist "build\web" rmdir /s /q "build\web"
 call flutter build web --release --base-href "/BISTDashboard/" --dart-define=API_URL="https://bistdashboard-9pag.onrender.com/api"
 
 if not exist "build\web\auth-config.js" (
