@@ -76,12 +76,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final targetController = controller ?? _activeSearchController ?? _searchController;
 
-    if (_watchlist.contains(upperSymbol)) {
+    void resetSearchInput() {
       targetController.clear();
+      _activeSearchController?.clear();
       if (mounted) {
         setState(() {
           _filterQuery = '';
         });
+      }
+    }
+
+    if (_watchlist.contains(upperSymbol)) {
+      resetSearchInput();
+      WidgetsBinding.instance.addPostFrameCallback((_) => resetSearchInput());
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$upperSymbol zaten listenizde ekli.'),
@@ -92,8 +101,6 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    await StorageService.addSymbol(upperSymbol);
-
     if (mounted) {
       setState(() {
         if (!_watchlist.contains(upperSymbol)) {
@@ -101,7 +108,15 @@ class _HomeScreenState extends State<HomeScreen> {
         }
         _filterQuery = '';
       });
-      targetController.clear();
+    }
+
+    resetSearchInput();
+    WidgetsBinding.instance.addPostFrameCallback((_) => resetSearchInput());
+
+    StorageService.addSymbol(upperSymbol);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('$upperSymbol listenize eklendi.'),
@@ -120,12 +135,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _removeSymbol(String symbol) async {
-    await StorageService.removeSymbol(symbol);
     if (mounted) {
       setState(() {
         _watchlist.remove(symbol);
         _quotes.remove(symbol);
+        _filterQuery = '';
       });
+      _activeSearchController?.clear();
+      _searchController.clear();
+    }
+
+    StorageService.removeSymbol(symbol);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('$symbol listeden çıkarıldı.'),
@@ -232,7 +255,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 });
               },
               onSubmitted: (String value) {
-                onFieldSubmitted();
                 _addSymbol(value, controller: textEditingController);
               },
             );
@@ -373,6 +395,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
             onTap: () {
+              if (!_watchlist.contains(symbol)) return;
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -474,7 +497,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 16),
                 const Center(
                   child: Text(
-                    'Versiyon (13.08.2026-07.30)',
+                    'Versiyon (13.08.2026-07.50)',
                     style: TextStyle(color: Colors.white38, fontSize: 12),
                   ),
                 ),

@@ -1,14 +1,14 @@
 class BistStocks {
   static const List<String> bist30 = [
     'AKBNK', 'ALARK', 'ASELS', 'ASTOR', 'BIMAS', 'BRSAN', 'EKGYO', 'ENKAI', 'EREGL', 'FROTO',
-    'GARAN', 'GUBRF', 'HEKTS', 'ISCTR', 'KCHOL', 'KONTR', 'KOZAL', 'KRDMD', 'MGROS', 'ODAS',
+    'GARAN', 'GUBRF', 'HEKTS', 'ISCTR', 'KCHOL', 'KONTR', 'KRDMD', 'MGROS', 'ODAS',
     'OYAKC', 'PETKM', 'PGSUS', 'SAHOL', 'SASA', 'SISE', 'TCELL', 'THYAO', 'TOASO', 'TUPRS'
   ];
 
   static const List<String> symbols = [
     'AKBNK', 'ALARK', 'ALBRK', 'ASELS', 'ASTOR', 'BIMAS', 'BRSAN', 'CANTE', 'CIMSA', 'CWENE', 
     'DOAS', 'DOHOL', 'EKGYO', 'ENJSA', 'ENKAI', 'EREGL', 'EUPWR', 'FROTO', 'GARAN', 'GESAN', 
-    'GUBRF', 'HALKB', 'HEKTS', 'ISCTR', 'ISGYO', 'KCHOL', 'KONTR', 'KORDS', 'KOZAA', 'KOZAL', 
+    'GUBRF', 'HALKB', 'HEKTS', 'ISCTR', 'ISGYO', 'KCHOL', 'KONTR', 'KORDS', 'KOZAA', 
     'KRDMD', 'MGROS', 'ODAS', 'OYAKC', 'PETKM', 'PGSUS', 'SAHOL', 'SASA', 'SISE', 'SMRTG', 
     'SOKM', 'TAVHL', 'TCELL', 'THYAO', 'TKFEN', 'TOASO', 'TSKB', 'TTKOM', 'TUPRS', 'VAKBN', 
     'VESTL', 'YKBNK', 'ZOREN', 'AKSA', 'AYDEM', 'BERA', 'BIOEN', 'BRYAT', 'CCOLA', 'ECILC', 

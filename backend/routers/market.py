@@ -49,7 +49,6 @@ BIST_COMPANY_NAMES = {
     "FROTO": "Ford Otosan",
     "ENKAI": "Enka İnşaat",
     "EKGYO": "Emlak Konut GYO",
-    "KOZAL": "Koza Altın",
     "KOZAA": "Koza Madencilik",
     "IPEKE": "İpek Doğal Enerji",
     "ASTOR": "Astor Enerji",
